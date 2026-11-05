@@ -42,7 +42,7 @@ window.addEventListener("beforeunload",()=>{for(const k in pend)if(pend[k]){clea
 /* ---------- состояние интерфейса ---------- */
 const now=new Date();
 const ui={view:"overview",calY:now.getFullYear(),calM:now.getMonth(),calSel:TODAY(),finY:now.getFullYear(),finM:now.getMonth(),taskFilter:"open",txType:"out",tag:{}};
-const VIEWS=[["overview","Обзор"],["calendar","Календарь"],["tasks","Задачи"],["finance","Финансы"],["loans","Кредиты"],["goals","Цели"],["habits","Привычки"],["notes","Заметки"]];
+const VIEWS=[["overview","Обзор"],["calendar","Календарь"],["tasks","Задачи"],["finance","Финансы"],["loans","Кредиты"],["goals","Цели"]];
 function go(v){if(VIEWS.some(x=>x[0]===v)){ui.view=v;if(window.PlanerHooks&&PlanerHooks.beforeGo)PlanerHooks.beforeGo(v);render();$("#main").scrollTop=0;if(API.platform==="web")window.scrollTo(0,0)}}
 
 /* ---------- отмена ---------- */
@@ -83,6 +83,10 @@ const tRange=e=>e.time?(e.end?e.time+"–"+e.end:e.time):"";
 function taskTime(t){if(t.time&&t.dur)return t.time+"–"+addMin(t.time,t.dur);if(t.time)return t.time;if(t.dur)return "≈ "+fmtDur(t.dur);return ""}
 const DURS=[15,30,45,60,90,120,180,240,360,480];
 function durSelect(id,sel){const opts=[...DURS];if(sel&&!opts.includes(+sel))opts.push(+sel),opts.sort((a,b)=>a-b);return `<select ${id?`id="${id}"`:""} name="dur" aria-label="Сколько займёт"><option value="">длительность</option>${opts.map(m=>`<option value="${m}" ${+sel===m?"selected":""}>${fmtDur(m)}</option>`).join("")}</select>`}
+const costInput=id=>`<input id="${id}" type="number" name="cost" min="0" step="any" placeholder="Стоимость, ₽" style="width:120px" aria-label="Стоимость">`;
+const costOf=x=>+x.cost||0;
+function costChip(k,x){return costOf(x)?`<button type="button" class="chip cchip num" data-act="costEdit" data-k="${k}" data-id="${x.id}" title="Стоимость — нажмите, чтобы изменить">${money(costOf(x))}</button>`:`<button type="button" class="tag-add" data-act="costEdit" data-k="${k}" data-id="${x.id}" title="Указать стоимость">+₽</button>`}
+function dayCost(s){let n=0;for(const e of eventsOn(s))n+=costOf(e);for(const t of S.tasks)if(t.date===s)n+=costOf(t);return n}
 function timeChip(k,x){const txt=k==="tasks"?taskTime(x):tRange(x);return txt?`<button type="button" class="chip tchip num" data-act="timeEdit" data-k="${k}" data-id="${x.id}" title="Изменить время">${esc(txt)}</button>`:`<button type="button" class="tag-add" data-act="timeEdit" data-k="${k}" data-id="${x.id}" title="Указать время">+время</button>`}
 const tagInput=(id,ph)=>`<input id="${id}" type="text" name="tags" placeholder="${ph||"#теги"}" autocomplete="off" style="width:130px">`;
 const ed=(k,id,f)=>`data-edit="${k}|${id}|${f}" title="Двойной щелчок — изменить"`;
@@ -94,7 +98,7 @@ function taskRow(t,showDate=true){
   if(t.date&&showDate){const cls=!t.done&&t.date<td?"late":t.date===td?"today":"";dc=`<span class="chip ${cls}">${nice(t.date)}</span>`}
   return `<div class="item ${t.done?"done":""}"><button type="button" class="prio ${t.prio||"mid"}" data-act="prioCycle" data-id="${t.id}" title="Приоритет: ${PRIO_NAME[t.prio||"mid"]}. Нажмите, чтобы сменить" aria-label="Приоритет: ${PRIO_NAME[t.prio||"mid"]}"></button>
   <input type="checkbox" class="check" data-act="toggleTask" data-id="${t.id}" ${t.done?"checked":""} aria-label="Готово: ${esc(t.title)}">
-  <span class="ibody"><span class="t" ${ed("tasks",t.id,"title")}>${esc(t.title)}${exTag(t)}</span><span class="meta">${timeChip("tasks",t)}${dc}${tagChips("tasks",t)}${t.list?`<span class="chip">${esc(t.list)}</span>`:""}</span></span>
+  <span class="ibody"><span class="t" ${ed("tasks",t.id,"title")}>${esc(t.title)}${exTag(t)}</span><span class="meta">${timeChip("tasks",t)}${costChip("tasks",t)}${dc}${tagChips("tasks",t)}${t.list?`<span class="chip">${esc(t.list)}</span>`:""}</span></span>
   <button class="icon" data-act="del" data-k="tasks" data-id="${t.id}" aria-label="Удалить">✕</button></div>`}
 
 function monthTotals(y,m){const p=y+"-"+pad(m+1);let inc=0,out=0;const cats={};
@@ -125,18 +129,14 @@ function vOverview(){
   if(isEmpty())html+=`<div class="banner"><p><b>Планер пока пустой.</b> Добавьте первую задачу ниже или откройте нужный раздел слева. Чтобы посмотреть, как всё работает, загрузите пример: такие записи помечены и убираются одной кнопкой.</p><button class="btn pri" data-act="seed">Заполнить примером</button></div>`;
   html+=`<div class="grid g-over">
   <section class="panel span2"><div class="panel-h"><h2>На сегодня${planned?` · запланировано ${fmtDur(planned)}`:""}</h2><a href="#" data-act="go" data-v="tasks">Все задачи →</a></div>
-    <form class="row" data-form="quickTask"><input id="qt" type="text" class="grow" name="title" placeholder="Новая задача на сегодня${API.platform==="web"?"":"  (⌘N)"}" required autocomplete="off"><input id="qt-time" type="time" name="time" aria-label="Время начала">${durSelect("qt-dur")}${prioSelect("qt-prio")}<button class="btn pri">Добавить</button></form>
+    <form class="row" data-form="quickTask"><input id="qt" type="text" class="grow" name="title" placeholder="Новая задача на сегодня${API.platform==="web"?"":"  (⌘N)"}" required autocomplete="off"><input id="qt-time" type="time" name="time" aria-label="Время начала">${durSelect("qt-dur")}${prioSelect("qt-prio")}${costInput("qt-cost")}<button class="btn pri">Добавить</button></form>
     <div class="list">${due.length?due.map(t=>taskRow(t)).join(""):`<p class="empty">${doneToday?"Всё на сегодня сделано.":"Задач на сегодня нет."}</p>`}</div></section>
-  <section class="panel"><div class="panel-h"><h2>Ближайшие 7 дней</h2><a href="#" data-act="go" data-v="calendar">Календарь →</a></div>
-    <div class="list">${evs.length?evs.map(({e,s})=>`<div class="item"><span class="dot" style="--ec:var(--${e.color||"c1"})"></span><span class="t">${esc(e.title)}${exTag(e)}</span><span class="chip ${s===td?"today":""}">${nice(s)}${e.time?" · "+esc(tRange(e)):""}</span><button class="icon" data-act="del" data-k="events" data-id="${e.id}" aria-label="Удалить">✕</button></div>`).join(""):'<p class="empty">Событий на неделе нет.</p>'}</div></section>
+  <section class="panel"><div class="panel-h"><h2>Ближайшие 7 дней${(()=>{let c=0;for(let i=0;i<7;i++)c+=dayCost(ymd(addDays(new Date(),i)));return c?" · "+money(c):""})()}</h2><a href="#" data-act="go" data-v="calendar">Календарь →</a></div>
+    <div class="list">${evs.length?evs.map(({e,s})=>`<div class="item"><span class="dot" style="--ec:var(--${e.color||"c1"})"></span><span class="t">${esc(e.title)}${exTag(e)}</span><span class="chip ${s===td?"today":""}">${nice(s)}${e.time?" · "+esc(tRange(e)):""}</span>${costOf(e)?`<span class="chip cchip num">${money(costOf(e))}</span>`:""}<button class="icon" data-act="del" data-k="events" data-id="${e.id}" aria-label="Удалить">✕</button></div>`).join(""):'<p class="empty">Событий на неделе нет.</p>'}</div></section>
   ${M.overviewTx()}
   ${M.overviewMoney()}
   <section class="panel"><div class="panel-h"><h2>Цели</h2><a href="#" data-act="go" data-v="goals">Все цели →</a></div>
     ${goals.length?goals.map(g=>{const p=goalPct(g);return`<div style="display:flex;flex-direction:column;gap:6px"><div class="panel-h"><span style="font-weight:600;overflow-wrap:anywhere;min-width:0">${esc(g.title)}${exTag(g)}</span><span class="num" style="font-size:12px;color:var(--muted)">${p}%</span></div><div class="pbar"><i style="width:${p}%"></i></div></div>`}).join(""):'<p class="empty">Целей пока нет.</p>'}</section>
-  <section class="panel"><div class="panel-h"><h2>Привычки сегодня</h2><a href="#" data-act="go" data-v="habits">Трекер →</a></div>
-    <div class="list">${S.habits.length?S.habits.map(h=>{const st=streak(h);const t=hT(h);const max=(h.mode||"min")==="max";const v=hv(h,td);
-     const ctl=(t===1&&!max)?`<input type="checkbox" class="check" data-act="habit" data-id="${h.id}" data-d="${td}" ${v?"checked":""} aria-label="${esc(h.name)}">`:`<span class="hctl"><button class="btn sm" data-act="hMinus" data-id="${h.id}" aria-label="Минус один">−</button><span class="num ${cellCls(h,td)}">${v}/${t}</span><button class="btn sm" data-act="hPlus" data-id="${h.id}" aria-label="Плюс один">+</button></span>`;
-     return `<div class="item">${ctl}<span class="t">${esc(h.name)}${exTag(h)}</span><span class="chip">${st} ${plural(st,"день","дня","дней")} подряд</span><button class="icon" data-act="del" data-k="habits" data-id="${h.id}" aria-label="Удалить">✕</button></div>`}).join(""):'<p class="empty">Добавьте привычку, чтобы отмечать её каждый день.</p>'}</div></section>
   ${M.overviewCats()}
   </div>`;
   return html}
@@ -158,7 +158,7 @@ function vTasks(){
    <form class="row" data-form="addTask">
      <input id="t-title" type="text" class="grow" name="title" placeholder="Что нужно сделать?" required autocomplete="off">
      <input id="t-date" type="date" name="date" aria-label="Срок">
-     <input id="t-time" type="time" name="time" aria-label="Время начала">${durSelect("t-dur")}
+     <input id="t-time" type="time" name="time" aria-label="Время начала">${durSelect("t-dur")}${costInput("t-cost")}
      <select id="t-prio" name="prio" aria-label="Приоритет"><option value="mid">Обычный</option><option value="high">Высокий</option><option value="low">Низкий</option></select>
      <input id="t-list" type="text" name="list" list="lists" placeholder="Список" style="width:120px" autocomplete="off">
      ${tagInput("t-tags")}
@@ -180,24 +180,26 @@ function vCalendar(){
     cells+=`<div class="wk" title="Неделя ${isoWeek(ws)}">${isoWeek(ws)}</div>`;
     for(let i=0;i<7;i++){const d=addDays(ws,i),s=ymd(d);
       const ev=eventsOn(s).filter(e=>byTag("events",e));const tk=S.tasks.filter(t=>t.date===s&&!t.done).sort(sortTasks);
-      const items=[...ev.map(e=>`<span class="ev" style="--ec:var(--${e.color||"c1"})">${e.time?esc(tRange(e))+" ":""}${esc(e.title)}</span>`),...tk.map(t=>`<span class="ev task p-${t.prio||"mid"}" title="Приоритет: ${PRIO_NAME[t.prio||"mid"]}">☐ ${t.time?esc(t.time)+" ":""}${esc(t.title)}</span>`)];
-      cells+=`<button type="button" class="day ${d.getMonth()!==m?"out":""} ${s===td?"is-today":""} ${s===ui.calSel?"sel":""}" data-act="calDay" data-d="${s}" aria-label="${d.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}"><span class="n">${d.getDate()}</span>${items.slice(0,3).join("")}${items.length>3?`<span class="more">ещё ${items.length-3}</span>`:""}<span class="dots">${[...ev.map(e=>`<span class="dot" style="--ec:var(--${e.color||"c1"})"></span>`),...tk.map(()=>'<span class="dot" style="--ec:var(--muted)"></span>')].slice(0,4).join("")}</span></button>`}
+      const items=[...ev.map(e=>`<span class="ev" style="--ec:var(--${e.color||"c1"})">${e.time?esc(tRange(e))+" ":""}${esc(e.title)}${costOf(e)?" · "+money(costOf(e)):""}</span>`),...tk.map(t=>`<span class="ev task p-${t.prio||"mid"}" title="Приоритет: ${PRIO_NAME[t.prio||"mid"]}">☐ ${t.time?esc(t.time)+" ":""}${esc(t.title)}</span>`)];
+      cells+=`<button type="button" class="day ${d.getMonth()!==m?"out":""} ${s===td?"is-today":""} ${s===ui.calSel?"sel":""}" data-act="calDay" data-d="${s}" aria-label="${d.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}"><span class="n">${d.getDate()}</span>${(()=>{const c=dayCost(s);return c?`<span class="dsum num">${money(c)}</span>`:""})()}${items.slice(0,3).join("")}${items.length>3?`<span class="more">ещё ${items.length-3}</span>`:""}<span class="dots">${[...ev.map(e=>`<span class="dot" style="--ec:var(--${e.color||"c1"})"></span>`),...tk.map(()=>'<span class="dot" style="--ec:var(--muted)"></span>')].slice(0,4).join("")}</span></button>`}
   }
   const sel=ui.calSel,sd=D(sel);
   const sev=eventsOn(sel);
   const stk=S.tasks.filter(t=>t.date===sel).sort(sortTasks);
-  return `<div class="head"><div><div class="eyebrow">${y}</div><h1>${MONTHS[m]}</h1></div>
+  let monthCost=0;{const last=new Date(y,m+1,0).getDate();for(let i=1;i<=last;i++)monthCost+=dayCost(ymd(new Date(y,m,i)))}
+  const selCost=dayCost(sel);
+  return `<div class="head"><div><div class="eyebrow">${y}${monthCost?` · запланировано трат ${money(monthCost)}`:""}</div><h1>${MONTHS[m]}</h1></div>
    <div style="display:flex;gap:6px"><button class="btn" data-act="calPrev" aria-label="Предыдущий месяц">←</button><button class="btn" data-act="calToday">Сегодня</button><button class="btn" data-act="calNext" aria-label="Следующий месяц">→</button></div></div>
   ${tagBar("events")}
   <div class="cal-wrap">
    <div class="cal">${cells}</div>
    <section class="panel">
-     <div><div class="eyebrow">${sd.toLocaleDateString("ru-RU",{weekday:"long"})}</div><div style="font-family:var(--f-display);font-weight:700;font-size:21px">${sd.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}</div></div>
+     <div><div class="eyebrow">${sd.toLocaleDateString("ru-RU",{weekday:"long"})}</div><div style="font-family:var(--f-display);font-weight:700;font-size:21px">${sd.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}</div>${selCost?`<div class="hint">Запланировано трат на день: <b class="num">${money(selCost)}</b></div>`:""}</div>
      <h2>События</h2>
-     <div class="list">${sev.length?sev.map(e=>`<div class="item"><span class="dot" style="--ec:var(--${e.color||"c1"})"></span><span class="ibody"><span class="t" ${ed("events",e.id,"title")}>${esc(e.title)}${exTag(e)}${e.repeat?` <span class="chip">↻ ${REPEAT[e.repeat].toLowerCase()}</span>`:""}</span><span class="meta">${timeChip("events",e)}${tagChips("events",e)}</span></span><button class="icon" data-act="del" data-k="events" data-id="${e.id}" aria-label="Удалить${e.repeat?" все повторы":""}">✕</button></div>`).join(""):'<p class="empty">Нет событий.</p>'}</div>
+     <div class="list">${sev.length?sev.map(e=>`<div class="item"><span class="dot" style="--ec:var(--${e.color||"c1"})"></span><span class="ibody"><span class="t" ${ed("events",e.id,"title")}>${esc(e.title)}${exTag(e)}${e.repeat?` <span class="chip">↻ ${REPEAT[e.repeat].toLowerCase()}</span>`:""}</span><span class="meta">${timeChip("events",e)}${costChip("events",e)}${tagChips("events",e)}</span></span><button class="icon" data-act="del" data-k="events" data-id="${e.id}" aria-label="Удалить${e.repeat?" все повторы":""}">✕</button></div>`).join(""):'<p class="empty">Нет событий.</p>'}</div>
      <form data-form="addEvent" style="display:flex;flex-direction:column;gap:8px">
        <input id="e-title" type="text" name="title" placeholder="Новое событие" required autocomplete="off">
-       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="mini">с<input id="e-time" type="time" name="time" aria-label="Начало"></label><label class="mini">до<input id="e-end" type="time" name="end" aria-label="Окончание"></label>${tagInput("e-tags")}
+       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap"><label class="mini">с<input id="e-time" type="time" name="time" aria-label="Начало"></label><label class="mini">до<input id="e-end" type="time" name="end" aria-label="Окончание"></label>${costInput("e-cost")}${tagInput("e-tags")}
          <select id="e-rep" name="repeat" aria-label="Повтор">${Object.entries(REPEAT).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select></div>
        <div style="display:flex;gap:8px;align-items:center"><span class="colors" role="radiogroup" aria-label="Цвет">${["c1","c2","c3","c4"].map((c,i)=>`<label><input type="radio" name="color" value="${c}" ${i===0?"checked":""}><span style="--ec:var(--${c})"></span></label>`).join("")}</span>
        <button class="btn pri" style="margin-left:auto">Добавить</button></div>
@@ -205,7 +207,7 @@ function vCalendar(){
      </form>
      <h2>Задачи на день</h2>
      <div class="list">${stk.length?stk.map(t=>taskRow(t,false)).join(""):'<p class="empty">Нет задач.</p>'}</div>
-     <form class="row" data-form="addDayTask"><input id="dt-title" type="text" class="grow" name="title" placeholder="Задача на этот день" required autocomplete="off"><input id="dt-time" type="time" name="time" aria-label="Время начала">${durSelect("dt-dur")}${prioSelect("dt-prio")}<button class="btn">Добавить</button></form>
+     <form class="row" data-form="addDayTask"><input id="dt-title" type="text" class="grow" name="title" placeholder="Задача на этот день" required autocomplete="off"><input id="dt-time" type="time" name="time" aria-label="Время начала">${durSelect("dt-dur")}${prioSelect("dt-prio")}${costInput("dt-cost")}<button class="btn">Добавить</button></form>
    </section>
   </div>`}
 
@@ -303,6 +305,11 @@ document.addEventListener("click",e=>{
     case "timeEdit":{const k=a.dataset.k;const x=LISTS[k]().find(i=>i.id===id);if(!x)break;const box=document.createElement("span");box.className="time-edit";
       box.innerHTML=(k==="tasks"?`<input type="time" class="te-a" value="${x.time||""}" aria-label="Время начала">${durSelect("",x.dur)}`:`<input type="time" class="te-a" value="${x.time||""}" aria-label="Начало"><span>–</span><input type="time" class="te-b" value="${x.end||""}" aria-label="Окончание">`)+`<button type="button" class="btn sm pri" data-act="timeSave" data-k="${k}" data-id="${id}">OK</button>`;
       a.replaceWith(box);editing=true;box.querySelector("input").focus();break}
+    case "costEdit":{const k=a.dataset.k;const x=LISTS[k]().find(i=>i.id===id);if(!x||editing)break;const box=document.createElement("span");box.className="time-edit";
+      box.innerHTML=`<input type="number" min="0" step="any" class="ce-v" value="${costOf(x)||""}" placeholder="₽" style="width:100px" aria-label="Стоимость"><button type="button" class="btn sm pri" data-act="costSave" data-k="${k}" data-id="${id}">OK</button>`;
+      a.replaceWith(box);editing=true;box.querySelector("input").focus();break}
+    case "costSave":{const k=a.dataset.k;const x=LISTS[k]().find(i=>i.id===id);const box=a.closest(".time-edit");editing=false;
+      if(x&&box){x.cost=Math.max(0,parseFloat(String(box.querySelector(".ce-v").value).replace(",","."))||0);save(SAVEKEY[k])}render();break}
     case "timeSave":{const k=a.dataset.k;const x=LISTS[k]().find(i=>i.id===id);const box=a.closest(".time-edit");editing=false;
       if(x&&box){x.time=box.querySelector(".te-a").value||"";if(k==="tasks")x.dur=+box.querySelector("select").value||0;else x.end=x.time?(box.querySelector(".te-b").value||""):"";save(k)}render();break}
     case "hMinus":habitAdd(id,TODAY(),-1);break;
@@ -344,7 +351,7 @@ let notesT=null;
 document.addEventListener("focusout",e=>{if(e.target.id!=="notes")return;setTimeout(()=>{const ae=document.activeElement;if((ae&&ae.id==="notes")||!ui.noteEdit)return;
   ui.noteEdit=null;if(notesT){clearTimeout(notesT);notesT=null;save("notes")}if(!editing)render()},150)});
 document.addEventListener("keydown",e=>{if(e.target.classList&&e.target.classList.contains("note-view")&&(e.key==="Enter"||e.key===" ")){e.preventDefault();e.target.click()}});
-document.addEventListener("keydown",e=>{const box=e.target.closest&&e.target.closest(".time-edit");if(!box)return;if(e.key==="Enter"){e.preventDefault();box.querySelector('[data-act="timeSave"]').click()}if(e.key==="Escape"){editing=false;render()}});
+document.addEventListener("keydown",e=>{const box=e.target.closest&&e.target.closest(".time-edit");if(!box)return;if(e.key==="Enter"){e.preventDefault();box.querySelector('[data-act="timeSave"],[data-act="costSave"]').click()}if(e.key==="Escape"){editing=false;render()}});
 document.addEventListener("input",e=>{
   if(M.onInput(e.target))return;
   if(e.target.id==="fin-q"){ui.finQ=e.target.value;render();return}
@@ -359,9 +366,9 @@ document.addEventListener("submit",e=>{
   if(kind==="addTask"||kind==="quickTask"||kind==="addDayTask"){
     const title=trim(v.title);if(!title)return;
     const date=kind==="quickTask"?TODAY():kind==="addDayTask"?ui.calSel:(v.date||"");
-    S.tasks.push({id:uid(),title,done:false,date,prio:v.prio||"mid",list:trim(v.list),tags:parseTags(v.tags),time:v.time||"",dur:+v.dur||0});save("tasks");
+    S.tasks.push({id:uid(),title,done:false,date,prio:v.prio||"mid",list:trim(v.list),tags:parseTags(v.tags),time:v.time||"",dur:+v.dur||0,cost:Math.max(0,parseFloat(String(v.cost||"").replace(",","."))||0)});save("tasks");
     focusId={addTask:"t-title",quickTask:"qt",addDayTask:"dt-title"}[kind]}
-  if(kind==="addEvent"){const title=trim(v.title);if(!title)return;S.events.push({id:uid(),title,date:ui.calSel,time:v.time||"",end:v.time&&v.end?v.end:"",color:v.color||"c1",repeat:v.repeat||"",tags:parseTags(v.tags)});save("events");focusId="e-title"}
+  if(kind==="addEvent"){const title=trim(v.title);if(!title)return;S.events.push({id:uid(),title,date:ui.calSel,time:v.time||"",end:v.time&&v.end?v.end:"",color:v.color||"c1",repeat:v.repeat||"",cost:Math.max(0,parseFloat(String(v.cost||"").replace(",","."))||0),tags:parseTags(v.tags)});save("events");focusId="e-title"}
   {const r=M.onSubmit(kind,v,trim);if(r!==undefined)focusId=r}
   if(kind==="addGoal"){const title=trim(v.title);const target=parseFloat(String(v.target).replace(",","."));const start=parseFloat(String(v.start||"0").replace(",","."))||0;if(!title||isNaN(target))return;if(target===start){toast("Цель должна отличаться от старта");return}S.goals.push({id:uid(),title,start,target,current:start,unit:trim(v.unit),deadline:v.deadline||"",tags:parseTags(v.tags)});save("goals");focusId="g-title"}
   if(kind==="addHabit"){const name=trim(v.name);if(!name)return;S.habits.push({id:uid(),name,days:{},target:Math.max(1,Math.round(+v.target||1)),mode:v.mode==="max"?"max":"min",created:TODAY(),tags:parseTags(v.tags)});save("habits");focusId="h-name"}

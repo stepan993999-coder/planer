@@ -124,7 +124,7 @@ function go(view) { if (win) { win.show(); win.webContents.send("planner:nav", v
 function buildMenu() {
   const sections = [
     ["overview", "Обзор"], ["calendar", "Календарь"], ["tasks", "Задачи"], ["finance", "Финансы"], ["loans", "Кредиты"],
-    ["goals", "Цели"], ["habits", "Привычки"], ["notes", "Заметки"]
+    ["goals", "Цели"]
   ];
   const template = [
     {

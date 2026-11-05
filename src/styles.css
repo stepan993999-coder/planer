@@ -359,3 +359,5 @@ a.nlink{color:var(--accent)}
 .money-now{display:flex;flex-direction:column;gap:2px;border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);padding:10px 0}
 .money-now .mn-total{font-family:var(--f-display);font-weight:300;font-size:24px}
 .wallet .kv b.wdebtv{color:var(--accent)}
+.day .dsum{font:600 10.5px var(--f-mono);color:var(--accent);padding:0 2px}
+.cchip{border:0;cursor:pointer;background:var(--accent-soft);color:var(--accent)}
