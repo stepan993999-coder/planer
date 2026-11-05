@@ -24,6 +24,9 @@ function txIsIncome(t){return catType(t.cat)==="Доход"}
 function catDirName(name){const c=cats().find(x=>x.name===name);return c&&c.dir==="in"?"in":"out"}
 function txDir(t){const c=cats().find(x=>x.name===t.cat);if(c&&c.type==="Долг")return c.dir==="in"?"in":"out";return t.dir||(t.type==="in"?"in":"out")}
 function sumCat(p,name){return S.finance.tx.filter(t=>(t.date||"").startsWith(p)&&t.cat===name).reduce((a,t)=>a+(+t.amount||0),0)}
+function debtStats(p){let i=0,o=0,mi=0,mo=0,n=0;for(const t of S.finance.tx){if(t.ex||catType(t.cat)!=="Долг")continue;n++;const a=+t.amount||0;const inn=txDir(t)==="in";
+    if(inn)i+=a;else o+=a;if(p&&(t.date||"").startsWith(p)){if(inn)mi+=a;else mo+=a}}return{n,inAll:i,outAll:o,net:i-o,inM:mi,outM:mo}}
+function debtNowText(d){return d.net>0?`долг ${rub(d.net)}`:d.net<0?`мне должны ${rub(-d.net)}`:"долгов нет"}
 function debtLine(){let i=0,o=0,n=0;for(const t of S.finance.tx){if(catType(t.cat)!=="Долг")continue;n++;if(txDir(t)==="in")i+=+t.amount||0;else o+=+t.amount||0}
   return n?`<p class="hint" style="margin:-8px 0 0">Долги за всё время: получено ${rub(i)}, отдано ${rub(o)}, разница ${money(i-o,true)}. В доходы, расходы и итог месяца не входят — учтены только в остатках наличных и карты.</p>`:""}
 function calc(){return C.compute(S.loans,real(),catType,new Date(),txDir)}
@@ -64,7 +67,6 @@ function vFinance(){
    <div class="stat"><small>Другие${planOth?` · план ${rub(planOth)}`:""}</small><span class="num ${planOth&&f.oth>planOth?"neg":""}">${rub(f.oth)}</span></div>
    <div class="stat" title="Доходы минус расходы за месяц"><small>Итог месяца</small><span class="num ${f.left<0?"neg":""}">${money(f.left,true)}</span></div>
   </div>
-  ${debtLine()}
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
    <section class="panel"><h2>Новая операция</h2>
     <form data-form="addTx" style="display:flex;flex-direction:column;gap:10px">
@@ -139,12 +141,12 @@ function walletStats(p){const r={};for(const w of WALLETS)r[w]={in:0,out:0,tin:0
 function trRow(t,scope){return `<tr class="trf"><td class="num">${D(t.date).toLocaleDateString("ru-RU",scope==="all"?{day:"2-digit",month:"2-digit",year:"2-digit"}:{day:"2-digit",month:"2-digit"})}</td><td>Перевод${exTag(t)}</td><td><span class="chip">перевод</span></td><td style="color:var(--muted);white-space:nowrap">${esc(t.from)} → ${esc(t.to)}</td><td style="color:var(--muted)">${esc(t.note)}</td><td>${tagChips("tx",t)}</td><td class="r num" style="color:var(--muted)">${rub(+t.amount)}</td><td class="r"><button class="icon" data-act="delTx" data-id="${t.id}" aria-label="Удалить">✕</button></td></tr>`}
 function walletsPanel(p,defDate){const ws=walletStats(p);const cfg=wcfg();const noPay=S.finance.tx.filter(t=>(t.date||"").startsWith(p)&&t.cat!==TRANSFER&&!WALLETS.includes(t.pay)).length;
   const bal={};for(const w of WALLETS)bal[w]=walletBalance(w);const neg=WALLETS.some(w=>bal[w]<0);
-  return `<section class="panel"><div class="panel-h"><h2>Наличные и карта</h2><button class="btn sm" data-act="walletSet">${ui.walletSet?"Готово":"Начальные остатки"}</button></div>
+  return `<section class="panel"><div class="panel-h"><h2>${debtStats().n?"Наличные, карта и долги":"Наличные и карта"}</h2><button class="btn sm" data-act="walletSet">${ui.walletSet?"Готово":"Начальные остатки"}</button></div>
    ${ui.walletSet?`<div class="wset">${WALLETS.map(w=>`<label>${w}: остаток<input type="number" step="0.01" id="ws-${w==="Карта"?"card":"cash"}-start" data-wset="${w}|start" value="${cfg[w].start||""}" placeholder="0"></label><label>на дату (считать операции с этого дня)<input type="date" id="ws-${w==="Карта"?"card":"cash"}-date" data-wset="${w}|date" value="${cfg[w].date||""}"></label>`).join("")}</div><span class="hint">Впишите, сколько было в кошельке на выбранную дату. Более ранние операции в остаток не попадут.</span>`:""}
-   <div class="wallets">${WALLETS.map(w=>{const s=ws[w];const b=bal[w];return `<div class="wallet"><div class="panel-h"><b>${w}</b><span class="num wbal ${b<0?"neg":""}">${money(b)}</span></div>
+   <div class="wallets">${(()=>{const d=debtStats(p);return d.n?`<div class="wallet debtw"><div class="panel-h"><b>Долги</b><span class="num wbal">${d.net<0?"−":""}${rub(Math.abs(d.net))}</span></div><div class="kv"><span>Пришло за месяц</span><b class="num pos">${d.inM?"+"+rub(d.inM):"0 ₽"}</b><span>Ушло за месяц</span><b class="num neg">${d.outM?"−"+rub(d.outM):"0 ₽"}</b><span>Сейчас</span><b>${d.net>0?"вы должны":d.net<0?"должны вам":"долгов нет"}</b></div><span class="hint">За всё время: получено ${rub(d.inAll)}, отдано ${rub(d.outAll)}</span></div>`:""})()}${WALLETS.map(w=>{const s=ws[w];const b=bal[w];return `<div class="wallet"><div class="panel-h"><b>${w}</b><span class="num wbal ${b<0?"neg":""}">${money(b)}</span></div>
     <div class="kv"><span>Пришло за месяц</span><b class="num pos">${s.in?"+"+rub(s.in):"0 ₽"}</b><span>Ушло за месяц</span><b class="num neg">${s.out?"−"+rub(s.out):"0 ₽"}</b><span>Переводы</span><b class="num">${s.tin||s.tout?[s.tin?"+"+rub(s.tin):"",s.tout?"−"+rub(s.tout):""].filter(Boolean).join(" / "):"—"}</b></div></div>`}).join("")}</div>
    <form class="row" data-form="transfer"><select id="tr-from" name="from" aria-label="Откуда"><option>Наличные</option><option>Карта</option></select><span class="hint">→</span><select id="tr-to" name="to" aria-label="Куда"><option>Карта</option><option>Наличные</option></select><input id="tr-amount" type="number" name="amount" min="0" step="0.01" placeholder="Сумма" required style="width:110px"><input id="tr-date" type="date" name="date" value="${defDate}" aria-label="Дата"><input id="tr-note" type="text" name="note" placeholder="Комментарий" class="grow" autocomplete="off"><button class="btn">Перевести</button></form>
-   <span class="hint">Перевод — одна операция: не доход и не расход, меняет только остатки.${neg?" Остаток ушёл в минус — задайте начальные остатки.":""}${noPay?` Операций без способа оплаты в этом месяце: ${noPay}, в остатки они не попадают.`:""}</span></section>`}
+   <span class="hint">Перевод — одна операция: не доход и не расход, меняет только остатки. Долги не входят в доходы, расходы и итог месяца, но меняют остатки.${neg?" Остаток ушёл в минус — задайте начальные остатки.":""}${noPay?` Операций без способа оплаты в этом месяце: ${noPay}, в остатки они не попадают.`:""}</span></section>`}
 
 function yearMonths(){const st=(S.loans&&S.loans.start)||(new Date().getFullYear()+"-01");return Array.from({length:12},(_,i)=>C.addMonths(st,i))}
 function vYear(){
@@ -328,7 +330,7 @@ function overviewMoney(){
   return `<section class="panel"><div class="panel-h"><h2>${MONTHS[d.getMonth()]}: деньги</h2><a href="#" data-act="go" data-v="finance">Финансы →</a></div>
     <div class="stats" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><div class="stat"><small>Доходы</small><span class="num pos">${rub(f.inc)}</span></div><div class="stat"><small>Расходы</small><span class="num neg">${rub(f.out)}</span></div></div>
     ${(()=>{const c=walletBalance("Наличные"),k=walletBalance("Карта");return `<div class="money-now"><div class="panel-h"><span class="hint">Денег сейчас</span><span class="num mn-total ${c+k<0?"neg":""}">${money(c+k)}</span></div>
-     <span class="hint">наличные ${money(c)} · карта ${money(k)}</span></div>`})()}
+     <span class="hint">наличные ${money(c)} · карта ${money(k)}${(()=>{const d=debtStats();return d.n?" · "+debtNowText(d):""})()}</span></div>`})()}
     <div class="panel-h"><span class="hint" title="Доходы минус расходы за месяц, без долгов">Итог месяца</span><span class="num ${f.left<0?"neg":"pos"}" style="font-weight:600">${money(f.left,true)}</span></div>
     ${loanHtml}</section>`}
 

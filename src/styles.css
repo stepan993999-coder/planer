@@ -270,7 +270,7 @@ button.prio:hover,button.prio:focus-visible{width:9px}
 .debtv{color:var(--accent)}
 .bar.debt .fill{background:var(--muted)}
 .tagnote{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--accent-soft);border:1px solid var(--accent);border-radius:8px;padding:8px 12px}
-.wallets{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+.wallets{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
 .wallet{background:var(--paper-2);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .wallet .wbal{font-size:20px;font-weight:700}
 .wset{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px}
@@ -358,3 +358,5 @@ a.nlink{color:var(--accent)}
 
 .money-now{display:flex;flex-direction:column;gap:2px;border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);padding:10px 0}
 .money-now .mn-total{font-family:var(--f-display);font-weight:300;font-size:24px}
+.wallet.debtw{order:3;background:var(--accent-soft)}
+.wallet.debtw .wbal{color:var(--accent)}
