@@ -126,6 +126,7 @@ window.plannerSync=api;   // на Mac window.planner защищён от под�
 document.addEventListener("click",e=>{if(e.target.closest('[data-act="syncMenu"]'))showAccount()});
 window.addEventListener("online",()=>{pushDirty();pull(false)});
 document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible"&&user){pushDirty();pull(false)}});
+let lastFocusPull=0;window.addEventListener("focus",()=>{if(user&&Date.now()-lastFocusPull>5000){lastFocusPull=Date.now();pushDirty();pull(false)}});
 setInterval(()=>{if(user&&Object.keys(dirty).length)pushDirty()},60000);
 window.addEventListener("pagehide",()=>{for(const k in pushT){clearTimeout(pushT[k])}pushDirty()});
 })();

@@ -409,7 +409,7 @@ API.load().then(data=>{
 });
 /* обновления с другого устройства (синхронизация) */
 let remotePending=false;
-const typing=()=>{const ae=document.activeElement;return editing||(ae&&$("#main").contains(ae)&&(/TEXTAREA|SELECT/.test(ae.tagName)||(ae.tagName==="INPUT"&&ae.value!=="")))};
+const typing=()=>{const ae=document.activeElement;if(editing)return true;if(!ae||!$("#main").contains(ae))return false;if(ae.tagName==="TEXTAREA")return true;return ae.tagName==="INPUT"&&/^(text|search|number|email|password|tel|url)$/.test(ae.type)&&ae.value!==""&&ae.dataset.goal===undefined&&!/^ln-budget/.test(ae.id)};
 if(API.onRemote)API.onRemote((k,v)=>{if(!(k in KEYS)||v==null)return;S[k]=Array.isArray(KEYS[k])?clone(v):Object.assign(clone(KEYS[k]),clone(v));if(typing()){remotePending=true;return}render()});
 document.addEventListener("focusout",()=>setTimeout(()=>{if(remotePending&&!typing()){remotePending=false;render()}},80));
 /* доступ для web.js */
