@@ -358,6 +358,4 @@ a.nlink{color:var(--accent)}
 
 .money-now{display:flex;flex-direction:column;gap:2px;border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);padding:10px 0}
 .money-now .mn-total{font-family:var(--f-display);font-weight:300;font-size:24px}
-.wallet .kv .wdebt{border-top:1px solid var(--line);padding-top:6px;margin-top:2px;font-weight:600;color:var(--ink)}
-.wallet .kv b.wdebt{font-size:14px}
-.wallet .kv span.wdebt{margin-right:-12px;padding-right:12px}
+.wallet .kv b.wdebtv{color:var(--accent)}
