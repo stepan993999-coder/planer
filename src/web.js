@@ -40,6 +40,16 @@ document.addEventListener("touchend",()=>clearTimeout(lpT),{passive:true});
 document.addEventListener("touchmove",()=>clearTimeout(lpT),{passive:true});
 document.addEventListener("click",e=>{if(lpFired&&e.target.closest(".hc")){lpFired=false;e.preventDefault();e.stopPropagation()}},true);
 
+/* обновления: при возвращении в приложение проверяем, не вышла ли новая версия */
+let appVer=null;
+async function readVer(){try{const r=await fetch("version.json?t="+Date.now(),{cache:"no-store"});if(r.ok)return (await r.json()).v}catch(e){}return null}
+readVer().then(v=>{appVer=v});
+async function checkUpdate(){const v=await readVer();if(!v||!appVer||v===appVer)return;const ae=document.activeElement;
+  if(ae&&/INPUT|TEXTAREA/.test(ae.tagName)&&ae.value){P().toast("Вышло обновление планера — оно применится при следующем открытии");appVer=v;return}
+  location.reload()}
+document.addEventListener("visibilitychange",()=>{if(document.visibilityState==="visible")checkUpdate()});
+setInterval(()=>{if(document.visibilityState==="visible")checkUpdate()},10*60*1000);
+
 /* офлайн-режим: кэш файлов приложения */
 if("serviceWorker" in navigator&&location.protocol==="https:")navigator.serviceWorker.register("sw.js").catch(()=>{});
 })();
