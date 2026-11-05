@@ -355,3 +355,6 @@ tr.curm td{background:var(--accent-soft)}
 a.nlink{color:var(--accent)}
 [hidden]{display:none!important}
 .panel .stat .num{font-size:20px;white-space:nowrap}
+
+.money-now{display:flex;flex-direction:column;gap:2px;border-top:1px dashed var(--line);border-bottom:1px dashed var(--line);padding:10px 0}
+.money-now .mn-total{font-family:var(--f-display);font-weight:300;font-size:24px}

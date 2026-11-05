@@ -25,7 +25,7 @@ function catDirName(name){const c=cats().find(x=>x.name===name);return c&&c.dir=
 function txDir(t){const c=cats().find(x=>x.name===t.cat);if(c&&c.type==="Долг")return c.dir==="in"?"in":"out";return t.dir||(t.type==="in"?"in":"out")}
 function sumCat(p,name){return S.finance.tx.filter(t=>(t.date||"").startsWith(p)&&t.cat===name).reduce((a,t)=>a+(+t.amount||0),0)}
 function debtLine(){let i=0,o=0,n=0;for(const t of S.finance.tx){if(catType(t.cat)!=="Долг")continue;n++;if(txDir(t)==="in")i+=+t.amount||0;else o+=+t.amount||0}
-  return n?`<p class="hint" style="margin:-8px 0 0">Долги за всё время: получено ${rub(i)}, отдано ${rub(o)}, разница ${money(i-o,true)}. В доходы и расходы не входят, но учтены в «Осталось».</p>`:""}
+  return n?`<p class="hint" style="margin:-8px 0 0">Долги за всё время: получено ${rub(i)}, отдано ${rub(o)}, разница ${money(i-o,true)}. В доходы и расходы не входят, но учтены в итоге месяца.</p>`:""}
 function calc(){return C.compute(S.loans,real(),catType,new Date(),txDir)}
 
 function monthStats(p,src){let inc=0,obl=0,cr=0,oth=0,dIn=0,dOut=0,cashIn=0,cashOut=0,cardOut=0;const by={};
@@ -62,7 +62,7 @@ function vFinance(){
    <div class="stat"><small>Обязательные${planObl?` · план ${rub(planObl)}`:""}</small><span class="num ${planObl&&f.obl>planObl?"neg":""}">${rub(f.obl)}</span></div>
    <div class="stat"><small>На кредиты</small><span class="num">${rub(f.cr)}</span></div>
    <div class="stat"><small>Другие${planOth?` · план ${rub(planOth)}`:""}</small><span class="num ${planOth&&f.oth>planOth?"neg":""}">${rub(f.oth)}</span></div>
-   <div class="stat"><small>Осталось</small><span class="num ${f.left<0?"neg":""}">${money(f.left,true)}</span>${f.debt?`<span class="sub">в т.ч. долги ${money(f.debt,true)}</span>`:""}</div>
+   <div class="stat" title="Доходы минус расходы за месяц"><small>Итог месяца</small><span class="num ${f.left<0?"neg":""}">${money(f.left,true)}</span>${f.debt?`<span class="sub">в т.ч. долги ${money(f.debt,true)}</span>`:""}</div>
   </div>
   ${debtLine()}
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
@@ -160,7 +160,7 @@ function vYear(){
   const foot=(label,arr,cls)=>`<tr class="foot"><td class="sticky">${label}</td><td></td><td></td>${arr.map(v=>`<td class="r num ${cls&&v<0?"neg":""}">${v?fmt(v):"·"}</td>`).join("")}<td class="r num"><b>${fmt(arr.reduce((a,b)=>a+b,0))}</b></td><td class="r num">${fmt(arr.reduce((a,b)=>a+b,0)/filledMonths)}</td></tr>`;
   return `<section class="panel"><div class="panel-h"><h2>Сводка по категориям и месяцам</h2><span class="hint">Красным — месяц, где расход по категории выше плана</span></div>
    <div class="tbl-wrap"><table class="year"><thead><tr><th class="sticky">Категория</th><th>Тип</th><th class="r">План</th>${ms.map(m=>`<th class="r">${monShort(m)}</th>`).join("")}<th class="r">Итого</th><th class="r">Среднее</th></tr></thead>
-   <tbody>${names.map(row).join("")}</tbody><tfoot>${foot("Доходы",inc)}${foot("Обязательные",obl)}${foot("Платежи по кредитам",cr)}${foot("Другие расходы",oth)}${dnet.some(v=>v)?foot("Долги (сальдо)",dnet,true):""}${foot("Осталось",left,true)}</tfoot></table></div></section>`}
+   <tbody>${names.map(row).join("")}</tbody><tfoot>${foot("Доходы",inc)}${foot("Обязательные",obl)}${foot("Платежи по кредитам",cr)}${foot("Другие расходы",oth)}${dnet.some(v=>v)?foot("Долги (сальдо)",dnet,true):""}${foot("Итог месяца",left,true)}</tfoot></table></div></section>`}
 const fmt=v=>new Intl.NumberFormat("ru-RU",{maximumFractionDigits:0}).format(Math.round(v));
 
 function vCats(){
@@ -327,9 +327,9 @@ function overviewMoney(){
      <span class="hint">Долг ${rub(s.debtNow)} · закроются ${s.closeMonth?monLabel(s.closeMonth).toLowerCase():"дольше 10 лет"}</span></div>`}
   return `<section class="panel"><div class="panel-h"><h2>${MONTHS[d.getMonth()]}: деньги</h2><a href="#" data-act="go" data-v="finance">Финансы →</a></div>
     <div class="stats" style="grid-template-columns:minmax(0,1fr) minmax(0,1fr)"><div class="stat"><small>Доходы</small><span class="num pos">${rub(f.inc)}</span></div><div class="stat"><small>Расходы</small><span class="num neg">${rub(f.out)}</span></div></div>
-    <div class="panel-h"><span class="hint">Осталось</span><span class="num" style="font-weight:600">${money(f.left,true)}</span></div>
-    <span class="hint">Наличные ${money(walletBalance("Наличные"))} · карта ${money(walletBalance("Карта"))}</span>
-    ${f.debt?`<span class="hint" style="margin-top:-10px;text-align:right">в т.ч. долги ${money(f.debt,true)}</span>`:""}
+    ${(()=>{const c=walletBalance("Наличные"),k=walletBalance("Карта");return `<div class="money-now"><div class="panel-h"><span class="hint">Денег сейчас</span><span class="num mn-total ${c+k<0?"neg":""}">${money(c+k)}</span></div>
+     <span class="hint">наличные ${money(c)} · карта ${money(k)}</span></div>`})()}
+    <div class="panel-h"><span class="hint" title="Доходы минус расходы за месяц${f.debt?", с учётом долгов":""}">Итог месяца${f.debt?` (в т.ч. долги ${money(f.debt,true)})`:""}</span><span class="num ${f.left<0?"neg":"pos"}" style="font-weight:600">${money(f.left,true)}</span></div>
     ${loanHtml}</section>`}
 
 /* ---------------- действия ---------------- */
@@ -369,7 +369,7 @@ function onSubmit(kind,v,trim){
   if(kind==="addTx"){const amt=Math.abs(parseFloat(String(v.amount).replace(",",".")));if(!amt||!v.cat)return "x-amount";
     const ty=catType(v.cat);const dd=ty==="Долг"?catDirName(v.cat):"";S.finance.tx.push({id:uid(),type:ty==="Доход"||dd==="in"?"in":"out",dir:dd||undefined,amount:amt,cat:v.cat,date:v.date||TODAY(),pay:ui.payWay||"Карта",note:trim(v.note),tags:parseTags(v.tags)});
     ui.lastCat=v.cat;save("finance");const d=D(v.date||TODAY());ui.finY=d.getFullYear();ui.finM=d.getMonth();
-    if(ty==="Кредит")toast(`Платёж учтён в разделе «Кредиты»`);else if(ty==="Долг")toast("Долг записан: не считается доходом или расходом, но учтён в «Осталось»");return "x-amount"}
+    if(ty==="Кредит")toast(`Платёж учтён в разделе «Кредиты»`);else if(ty==="Долг")toast("Долг записан: не считается доходом или расходом, но учтён в итоге месяца");return "x-amount"}
   if(kind==="transfer"){const amt=Math.abs(parseFloat(String(v.amount).replace(",",".")));if(!amt)return "tr-amount";if(v.from===v.to){toast("Выберите разные кошельки");return "tr-to"}
     S.finance.tx.push({id:uid(),type:"transfer",cat:TRANSFER,from:v.from,to:v.to,amount:amt,date:v.date||TODAY(),pay:"",note:trim(v.note),tags:[]});save("finance");toast(`Перевод ${v.from} → ${v.to} записан: остатки обновлены`);return "tr-amount"}
   if(kind==="addCat"){const name=trim(v.name);if(!name)return "c-name";if(cats().some(c=>c.name.toLowerCase()===name.toLowerCase())){toast("Такая категория уже есть");return "c-name"}
