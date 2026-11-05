@@ -8,5 +8,7 @@ contextBridge.exposeInMainWorld("planner", {
   notify: (title, body) => ipcRenderer.send("planner:notify", title, body),
   openDataFolder: () => ipcRenderer.send("planner:openDataFolder"),
   onNav: cb => ipcRenderer.on("planner:nav", (_e, v) => cb(v)),
-  onNewTask: cb => ipcRenderer.on("planner:newTask", () => cb())
+  onNewTask: cb => ipcRenderer.on("planner:newTask", () => cb()),
+  onUndo: cb => ipcRenderer.on("planner:undo", () => cb()),
+  onRedo: cb => ipcRenderer.on("planner:redo", () => cb())
 });

@@ -36,7 +36,7 @@ const CATS_IN=["Зарплата","Фриланс","Подарки","Возвр�
 
 /* ---------- хранение ---------- */
 const pend={};
-function save(k){clearTimeout(pend[k]);pend[k]=setTimeout(()=>{pend[k]=null;API.save(k,clone(S[k]))},250)}
+function save(k){histRecord(k);clearTimeout(pend[k]);pend[k]=setTimeout(()=>{pend[k]=null;API.save(k,clone(S[k]))},250)}
 window.addEventListener("beforeunload",()=>{for(const k in pend)if(pend[k]){clearTimeout(pend[k]);API.save(k,clone(S[k]))}});
 
 /* ---------- состояние интерфейса ---------- */
@@ -405,13 +405,34 @@ API.load().then(data=>{
   data=data||{};
   for(const k in KEYS){if(data[k]!=null)S[k]=Array.isArray(KEYS[k])?data[k]:Object.assign(clone(KEYS[k]),data[k])}
   migrate();
+  for(const k in KEYS)HIST.base[k]=JSON.stringify(S[k]);HIST.undo=[];HIST.redo=[];
   render();checkReminders();
 });
 /* обновления с другого устройства (синхронизация) */
 let remotePending=false;
 const typing=()=>{const ae=document.activeElement;if(editing)return true;if(!ae||!$("#main").contains(ae))return false;if(ae.tagName==="TEXTAREA")return true;return ae.tagName==="INPUT"&&/^(text|search|number|email|password|tel|url)$/.test(ae.type)&&ae.value!==""&&ae.dataset.goal===undefined&&!/^ln-budget/.test(ae.id)};
-if(API.onRemote)API.onRemote((k,v)=>{if(!(k in KEYS)||v==null)return;S[k]=Array.isArray(KEYS[k])?clone(v):Object.assign(clone(KEYS[k]),clone(v));if(typing()){remotePending=true;return}render()});
+if(API.onRemote)API.onRemote((k,v)=>{if(!(k in KEYS)||v==null)return;histRemote(k,v);S[k]=Array.isArray(KEYS[k])?clone(v):Object.assign(clone(KEYS[k]),clone(v));if(typing()){remotePending=true;return}render()});
 document.addEventListener("focusout",()=>setTimeout(()=>{if(remotePending&&!typing()){remotePending=false;render()}},80));
+/* ---------- история изменений: ⌘Z — отменить, ⇧⌘Z — повторить ---------- */
+var HIST={undo:[],redo:[],base:{},last:{k:null,t:0},busy:false};
+const HNAME={tasks:"Задачи",events:"Календарь",finance:"Финансы",goals:"Цели",habits:"Привычки",notes:"Заметки",loans:"Кредиты"};
+function histRecord(k){if(HIST.busy)return;const cur=JSON.stringify(S[k]);const prev=HIST.base[k];HIST.base[k]=cur;if(prev===undefined||prev===cur)return;
+  const now=Date.now();const merge=HIST.last.k===k&&now-HIST.last.t<700&&HIST.undo.length&&HIST.undo[HIST.undo.length-1].k===k;
+  if(!merge){HIST.undo.push({k,prev});if(HIST.undo.length>100)HIST.undo.shift()}
+  HIST.last={k,t:now};HIST.redo=[]}
+function histRemote(k,v){HIST.base[k]=JSON.stringify(v);HIST.undo=HIST.undo.filter(e=>e.k!==k);HIST.redo=HIST.redo.filter(e=>e.k!==k)}
+function histStep(from,to,word){const e=from.pop();if(!e){toast(word==="Отменено"?"Нечего отменять":"Нечего повторять");return}
+  to.push({k:e.k,prev:JSON.stringify(S[e.k])});HIST.busy=true;
+  const v=JSON.parse(e.prev);S[e.k]=Array.isArray(KEYS[e.k])?v:Object.assign(clone(KEYS[e.k]),v);HIST.base[e.k]=e.prev;HIST.last={k:null,t:0};
+  clearTimeout(pend[e.k]);pend[e.k]=null;API.save(e.k,clone(S[e.k]));HIST.busy=false;editing=false;render();toast(`${word}: изменение в разделе «${HNAME[e.k]||e.k}»`)}
+const histUndo=()=>histStep(HIST.undo,HIST.redo,"Отменено");
+const histRedo=()=>histStep(HIST.redo,HIST.undo,"Повторено");
+const isTextField=t=>t&&(t.tagName==="TEXTAREA"||t.isContentEditable||(t.tagName==="INPUT"&&/^(text|search|number|email|password|tel|url)$/.test(t.type)));
+document.addEventListener("keydown",e=>{if(!(e.metaKey||e.ctrlKey)||e.altKey||e.code!=="KeyZ")return;if(isTextField(e.target))return;e.preventDefault();e.shiftKey?histRedo():histUndo()});
+/* в программе для Mac ⌘Z приходит из меню «Правка» */
+function menuUndo(redo){const t=document.activeElement;if(isTextField(t)){document.execCommand(redo?"redo":"undo");return}redo?histRedo():histUndo()}
+if(API.onUndo)API.onUndo(()=>menuUndo(false));
+if(API.onRedo)API.onRedo(()=>menuUndo(true));
 /* доступ для web.js */
 window.Planer={S,ui,KEYS,render,go,save,clone,migrate,toast,esc,habitAdd};
 /* Перенос данных из таблицы Excel и обновление старого формата финансов — один раз */

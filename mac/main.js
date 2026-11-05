@@ -157,8 +157,8 @@ function buildMenu() {
     {
       label: "Правка",
       submenu: [
-        { role: "undo", label: "Отменить" },
-        { role: "redo", label: "Повторить" },
+        { label: "Отменить", accelerator: "CmdOrCtrl+Z", click: () => win && win.webContents.send("planner:undo") },
+        { label: "Повторить", accelerator: "Shift+CmdOrCtrl+Z", click: () => win && win.webContents.send("planner:redo") },
         { type: "separator" },
         { role: "cut", label: "Вырезать" },
         { role: "copy", label: "Копировать" },
