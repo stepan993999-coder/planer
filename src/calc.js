@@ -63,7 +63,7 @@ function compute(L,tx,catType,today,catDir){catDir=catDir||(t=>t.dir||"out");
       const has=f.count>0;const debt=v.reduce((a,b)=>a+b,0);const p=plan[i];
       let status="";if(p.status==="факт")status=debt<1?"долгов нет":debt>orig[i].endTotal+1000?"отстаёте":debt<orig[i].endTotal-1000?"опережаете":"по плану";else if(has)status="месяц идёт";
       const paid=f.paid.reduce((a,b)=>a+b,0);
-      acct.push({month:m,has,count:f.count,inc:f.inc,obl:f.obl,oth:f.oth,paid:f.paid.slice(),paidTotal:paid,need:p.need,diff:paid-p.need,left:f.inc-f.obl-f.oth-paid+f.debt,debt:f.debt,
+      acct.push({month:m,has,count:f.count,inc:f.inc,obl:f.obl,oth:f.oth,paid:f.paid.slice(),paidTotal:paid,need:p.need,diff:paid-p.need,left:f.inc-f.obl-f.oth-paid,debt:f.debt,
         debtByLoan:v.slice(),debt:debt,origDebt:orig[i].endTotal,status,cashIn:f.cashIn,cashOut:f.cashOut,cardOut:f.cardOut})}}
 
   const filled=acct.filter(a=>a.has);
