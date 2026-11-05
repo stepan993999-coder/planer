@@ -7,7 +7,7 @@ rm -rf app dist && mkdir -p app/src app/vendor
 cp main.js preload.js package.json index.html app/
 cp ../config.js app/
 cp ../src/*.js ../src/*.css app/src/ && rm -f app/src/web.js app/src/web.css
-cp ../vendor/supabase.js ../vendor/591.supabase.js app/vendor/
+cp ../vendor/supabase.js app/vendor/
 cp icon.icns app/ 2>/dev/null || true
 [ -d node_modules/@electron/packager ] || npm i --no-save @electron/packager@20.3.0 >/dev/null
 VER=$(node -p "require('./package.json').version")
