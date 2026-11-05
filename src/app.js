@@ -129,6 +129,7 @@ function vOverview(){
     <div class="list">${due.length?due.map(t=>taskRow(t)).join(""):`<p class="empty">${doneToday?"Всё на сегодня сделано.":"Задач на сегодня нет."}</p>`}</div></section>
   <section class="panel"><div class="panel-h"><h2>Ближайшие 7 дней</h2><a href="#" data-act="go" data-v="calendar">Календарь →</a></div>
     <div class="list">${evs.length?evs.map(({e,s})=>`<div class="item"><span class="dot" style="--ec:var(--${e.color||"c1"})"></span><span class="t">${esc(e.title)}${exTag(e)}</span><span class="chip ${s===td?"today":""}">${nice(s)}${e.time?" · "+esc(tRange(e)):""}</span><button class="icon" data-act="del" data-k="events" data-id="${e.id}" aria-label="Удалить">✕</button></div>`).join(""):'<p class="empty">Событий на неделе нет.</p>'}</div></section>
+  ${M.overviewTx()}
   ${M.overviewMoney()}
   <section class="panel"><div class="panel-h"><h2>Цели</h2><a href="#" data-act="go" data-v="goals">Все цели →</a></div>
     ${goals.length?goals.map(g=>{const p=goalPct(g);return`<div style="display:flex;flex-direction:column;gap:6px"><div class="panel-h"><span style="font-weight:600;overflow-wrap:anywhere;min-width:0">${esc(g.title)}${exTag(g)}</span><span class="num" style="font-size:12px;color:var(--muted)">${p}%</span></div><div class="pbar"><i style="width:${p}%"></i></div></div>`}).join(""):'<p class="empty">Целей пока нет.</p>'}</section>

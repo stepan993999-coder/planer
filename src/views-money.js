@@ -69,17 +69,7 @@ function vFinance(){
    <div class="stat" title="Доходы минус расходы за месяц"><small>Итог месяца</small><span class="num ${f.left<0?"neg":""}">${money(f.left,true)}</span></div>
   </div>
   <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(340px,1fr))">
-   <section class="panel"><h2>Новая операция</h2>
-    <form data-form="addTx" style="display:flex;flex-direction:column;gap:10px">
-     <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="x-amount" type="number" name="amount" min="0" step="0.01" placeholder="Сумма, без минуса" required class="grow">
-     <input id="x-date" type="date" name="date" value="${defDate}" required aria-label="Дата"></div>
-     <select id="x-cat" name="cat" required aria-label="Категория"><option value="" disabled ${ui.lastCat?"":"selected"}>Категория…</option>${catOptions(ui.lastCat)}</select>
-     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <div class="seg" role="radiogroup" aria-label="Способ оплаты">${["Карта","Наличные"].map(v=>`<button type="button" data-act="payWay" data-v="${v}" aria-pressed="${(ui.payWay||"Карта")===v}">${v}</button>`).join("")}</div>
-      <input id="x-note" type="text" name="note" placeholder="Комментарий" autocomplete="off" class="grow">${tagInput("x-tags")}</div>
-     <button class="btn pri">Записать</button>
-     <span class="hint">Тип подставится сам по категории. Платёж с категорией «Кредит: …» сразу попадёт в раздел «Кредиты». Категории типа «Долг» не считаются доходом или расходом.</span>
-    </form></section>
+   ${txForm(defDate)}
    <section class="panel"><div class="panel-h"><h2>${picked()?"Выбранные категории":"Расходы против плана"}</h2><button class="btn sm" data-act="finTab" data-t="cats">Выбрать категории</button></div>${catBars(p)}</section>
   </div>
   ${walletsPanel(p,defDate)}
@@ -149,6 +139,18 @@ function walletsPanel(p,defDate){const hasDebt=debtStats().n>0;const ws=walletSt
    <form class="row" data-form="transfer"><select id="tr-from" name="from" aria-label="Откуда"><option>Наличные</option><option>Карта</option></select><span class="hint">→</span><select id="tr-to" name="to" aria-label="Куда"><option>Карта</option><option>Наличные</option></select><input id="tr-amount" type="number" name="amount" min="0" step="0.01" placeholder="Сумма" required style="width:110px"><input id="tr-date" type="date" name="date" value="${defDate}" aria-label="Дата"><input id="tr-note" type="text" name="note" placeholder="Комментарий" class="grow" autocomplete="off"><button class="btn">Перевести</button></form>
    <span class="hint">Перевод — одна операция: не доход и не расход, меняет только остатки.${hasDebt?" «Пришло» и «Ушло» — без долгов; долг показан отдельной строкой, но входит в остаток.":""}${neg?" Остаток ушёл в минус — задайте начальные остатки.":""}${noPay?` Операций без способа оплаты в этом месяце: ${noPay}, в остатки они не попадают.`:""}</span></section>`}
 
+function txForm(defDate,overview){return `<section class="panel ${overview?"txq":""}"><div class="panel-h"><h2>Новая операция</h2>${overview?'<a href="#" data-act="go" data-v="finance">Финансы →</a>':""}</div>
+    <form data-form="addTx" style="display:flex;flex-direction:column;gap:10px">
+     <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="x-amount" type="number" name="amount" min="0" step="0.01" placeholder="Сумма, без минуса" required class="grow">
+     <input id="x-date" type="date" name="date" value="${defDate}" required aria-label="Дата"></div>
+     <select id="x-cat" name="cat" required aria-label="Категория"><option value="" disabled ${ui.lastCat?"":"selected"}>Категория…</option>${catOptions(ui.lastCat)}</select>
+     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <div class="seg" role="radiogroup" aria-label="Способ оплаты">${["Карта","Наличные"].map(v=>`<button type="button" data-act="payWay" data-v="${v}" aria-pressed="${(ui.payWay||"Карта")===v}">${v}</button>`).join("")}</div>
+      <input id="x-note" type="text" name="note" placeholder="Комментарий" autocomplete="off" class="grow">${tagInput("x-tags")}</div>
+     <button class="btn pri">Записать</button>
+     ${overview?"":`<span class="hint">Тип подставится сам по категории. Платёж с категорией «Кредит: …» сразу попадёт в раздел «Кредиты». Категории типа «Долг» не считаются доходом или расходом.</span>`}
+    </form></section>`}
+function overviewTx(){return txForm(TODAY(),true)}
 function yearMonths(){const st=(S.loans&&S.loans.start)||(new Date().getFullYear()+"-01");return Array.from({length:12},(_,i)=>C.addMonths(st,i))}
 function vYear(){
   const ms=yearMonths();const src=S.finance.tx;
@@ -372,7 +374,7 @@ function onSubmit(kind,v,trim){
   if(kind==="addTx"){const amt=Math.abs(parseFloat(String(v.amount).replace(",",".")));if(!amt||!v.cat)return "x-amount";
     const ty=catType(v.cat);const dd=ty==="Долг"?catDirName(v.cat):"";S.finance.tx.push({id:uid(),type:ty==="Доход"||dd==="in"?"in":"out",dir:dd||undefined,amount:amt,cat:v.cat,date:v.date||TODAY(),pay:ui.payWay||"Карта",note:trim(v.note),tags:parseTags(v.tags)});
     ui.lastCat=v.cat;save("finance");const d=D(v.date||TODAY());ui.finY=d.getFullYear();ui.finM=d.getMonth();
-    if(ty==="Кредит")toast(`Платёж учтён в разделе «Кредиты»`);else if(ty==="Долг")toast("Долг записан: не входит в доходы, расходы и итог месяца — меняет только остаток денег");return "x-amount"}
+    if(ty==="Кредит")toast(`Платёж учтён в разделе «Кредиты»`);else if(ty==="Долг")toast("Долг записан: не входит в доходы, расходы и итог месяца — меняет только остаток денег");else toast(`Записано: ${ty==="Доход"?"+":"−"}${rub(amt)} · ${v.cat}`);return "x-amount"}
   if(kind==="transfer"){const amt=Math.abs(parseFloat(String(v.amount).replace(",",".")));if(!amt)return "tr-amount";if(v.from===v.to){toast("Выберите разные кошельки");return "tr-to"}
     S.finance.tx.push({id:uid(),type:"transfer",cat:TRANSFER,from:v.from,to:v.to,amount:amt,date:v.date||TODAY(),pay:"",note:trim(v.note),tags:[]});save("finance");toast(`Перевод ${v.from} → ${v.to} записан: остатки обновлены`);return "tr-amount"}
   if(kind==="addCat"){const name=trim(v.name);if(!name)return "c-name";if(cats().some(c=>c.name.toLowerCase()===name.toLowerCase())){toast("Такая категория уже есть");return "c-name"}
@@ -385,5 +387,5 @@ function onSubmit(kind,v,trim){
 function renameCat(i,newName){const c=cats()[i];if(!c)return;const old=c.name;newName=newName.trim();if(!newName||newName===old)return;
   c.name=newName;for(const t of S.finance.tx)if(t.cat===old)t.cat=newName;if(S.loans)for(const l of S.loans.list||[])if(l.cat===old)l.cat=newName;save("finance");save("loans")}
 
-return {vFinance,vLoans,overviewMoney,overviewCats,onInput,onClick,onChange,onSubmit,renameCat,catType,calc,TYPES};
+return {vFinance,vLoans,overviewMoney,overviewCats,overviewTx,onInput,onClick,onChange,onSubmit,renameCat,catType,calc,TYPES};
 };
