@@ -104,12 +104,15 @@ async function load(){
   data=await localLoad();if(!LOCAL)data=data||{};
   observer.observe(document.body,{childList:true,subtree:true});
   if(!configured){status("local","Данные только на этом устройстве");return clone(data)}
-  sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseKey,{auth:{persistSession:true,autoRefreshToken:true,storageKey:"planer-auth"}});
+  try{sb=window.supabase.createClient(CFG.supabaseUrl,CFG.supabaseKey,{auth:{persistSession:true,autoRefreshToken:true,storageKey:"planer-auth",lock:async(n,t,fn)=>fn()}})}
+  catch(e){console.error(e);status("err","Синхронизация не запустилась: "+e.message);return clone(data)}
   setTimeout(async()=>{
-    const {data:s}=await sb.auth.getSession();
+    let s=null;
+    try{s=(await Promise.race([sb.auth.getSession(),new Promise((_,rej)=>setTimeout(()=>rej(new Error("нет ответа")),8000))])).data}
+    catch(e){console.warn(e)}
     if(s&&s.session)await onUser(s.session.user);
     else if(lsGet(LS_MODE,"")!=="local")showLogin();
-    else status("local","Без синхронизации");
+    else status("local","Без синхронизации — нажмите, чтобы войти");
     sb.auth.onAuthStateChange((ev,ses)=>{if(ses&&ses.user&&(!user||user.id!==ses.user.id))onUser(ses.user)});
   },30);
   return clone(data);
@@ -118,7 +121,7 @@ function save(k,v){data[k]=clone(v);localSave(k,data[k]);if(sb&&user){markDirty(
 
 const api=Object.assign({},LOCAL||{badge(){},notify(){},openDataFolder(){},onNav(){},onNewTask(){}},{
   platform:PLATFORM,load,save,onRemote:cb=>{listeners.push(cb)},syncMenu:showAccount});
-window.planner=api;
+window.plannerSync=api;   // на Mac window.planner защищён от подмены, поэтому отдельное имя
 
 document.addEventListener("click",e=>{if(e.target.closest('[data-act="syncMenu"]'))showAccount()});
 window.addEventListener("online",()=>{pushDirty();pull(false)});

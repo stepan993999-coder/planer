@@ -1,6 +1,6 @@
 (function(){
 "use strict";
-const API=window.planner||{load:async()=>{try{return JSON.parse(localStorage.getItem("planner")||"{}")}catch(e){return{}}},save:async(k,v)=>{try{const o=JSON.parse(localStorage.getItem("planner")||"{}");o[k]=v;localStorage.setItem("planner",JSON.stringify(o))}catch(e){}},badge(){},notify(){},openDataFolder(){},onNav(){},onNewTask(){}};
+const API=window.plannerSync||window.planner||{load:async()=>{try{return JSON.parse(localStorage.getItem("planner")||"{}")}catch(e){return{}}},save:async(k,v)=>{try{const o=JSON.parse(localStorage.getItem("planner")||"{}");o[k]=v;localStorage.setItem("planner",JSON.stringify(o))}catch(e){}},badge(){},notify(){},openDataFolder(){},onNav(){},onNewTask(){}};
 const KEYS={tasks:[],events:[],finance:{tx:[],cur:"RUB",budgets:{},cats:[]},goals:[],habits:[],notes:{text:"",items:[]},loans:{list:[],budget:0,start:"",target:"",mode:"reduce",appBal:{}}};
 const S={};for(const k in KEYS)S[k]=clone(KEYS[k]);
 function clone(x){return JSON.parse(JSON.stringify(x))}
