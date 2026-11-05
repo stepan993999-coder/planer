@@ -1,0 +1,15 @@
+/* окно входа и синхронизации */
+.sync-ov{position:fixed;inset:0;z-index:100;background:rgba(10,10,10,.55);display:flex;align-items:center;justify-content:center;
+  padding:max(16px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+.sync-ov[hidden]{display:none!important}
+.sync-box{background:var(--paper);color:var(--ink);border:1px solid var(--line);width:100%;max-width:420px;padding:26px;display:flex;flex-direction:column;gap:12px;user-select:text}
+.sync-box h2{font-size:12px;margin:0}
+.sync-box p{margin:0;line-height:1.5}
+.sync-box form{display:flex;flex-direction:column;gap:12px}
+.sync-box input{font-size:16px}
+.sync-actions{display:flex;gap:8px;flex-wrap:wrap}
+.sync-msg{min-height:1.2em;color:var(--bad);font-size:13px}
+.sync-skip{color:var(--muted);font-size:12px;text-decoration:underline;align-self:flex-start}
+.sync{display:flex;gap:7px;align-items:flex-start;font-size:11.5px;color:var(--muted);background:none;border:0;padding:0;cursor:pointer;text-align:left}
+.sync b{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none;margin-top:4px}
+.sync[data-s="ok"] b{background:var(--good)} .sync[data-s="err"] b{background:var(--bad)} .sync[data-s="local"] b,.sync[data-s="busy"] b{background:var(--warn)}

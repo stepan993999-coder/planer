@@ -1,0 +1,4 @@
+node_modules/
+mac/app/
+mac/dist/
+.DS_Store

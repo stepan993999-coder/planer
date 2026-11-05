@@ -1,0 +1,55 @@
+/* версия для iPhone и браузера */
+body{background:var(--bg)}
+.side{padding-top:24px}
+.day .dots{display:none;gap:3px;flex-wrap:wrap}
+.tabbar{display:none;flex-direction:row!important;gap:0!important;position:fixed;left:0;right:0;bottom:0;z-index:30;background:var(--paper);border-top:1px solid var(--line);
+  padding:6px max(8px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(8px,env(safe-area-inset-left,0px));justify-content:space-around}
+.tabbar button{flex:1;min-width:0;border:0;background:none;display:flex;flex-direction:column;align-items:center;gap:3px;font-size:9.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);padding:4px 0;cursor:pointer;font-weight:600}
+.tabbar svg{width:23px;height:23px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.tabbar button[aria-current="page"]{color:var(--accent)}
+.sheet{position:fixed;left:0;right:0;bottom:calc(61px + env(safe-area-inset-bottom,0px));z-index:29;background:var(--paper);border-top:1px solid var(--line);
+  padding:14px max(16px,env(safe-area-inset-right,0px)) 14px max(16px,env(safe-area-inset-left,0px));display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.sheet[hidden]{display:none!important}
+.sheet>button{border:1px solid var(--line);background:var(--paper-2);padding:14px 12px;font-weight:500;font-size:11px;letter-spacing:.16em;text-transform:uppercase;text-align:left;cursor:pointer;color:var(--ink)}
+.sheet>button[aria-current="page"]{border-color:var(--accent);color:var(--accent)}
+.sheet .sheet-foot{grid-column:1/-1;display:flex;justify-content:space-between;align-items:center;gap:10px;padding-top:4px}
+.sheet .sheet-foot .linkish{color:var(--accent);font-size:12px}
+@media (max-width:760px){
+  html,body{height:auto}
+  body{overflow:auto;user-select:auto}
+  .app{display:block;height:auto}
+  .side{display:none}
+  main{overflow:visible;border-left:0;padding-top:calc(18px + env(safe-area-inset-top,0px));padding-bottom:calc(96px + env(safe-area-inset-bottom,0px));
+    padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+  .tabbar{display:flex}
+  .wrap{gap:16px}
+  h1{font-size:22px} .today-big{font-size:42px}
+  .g-over{grid-template-columns:minmax(0,1fr)} .span2,.panel.wide{grid-column:auto}
+  .stats,.stats.s4,.stats.s5{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .grid[style]{grid-template-columns:minmax(0,1fr)!important}
+  .panel{padding:16px}
+  input[type=text],input[type=search],input[type=number],input[type=date],input[type=time],input[type=month],input[type=email],input[type=password],select,textarea{font-size:16px}
+  form.row>input,form.row>select{flex:1 1 140px}
+  .btn{padding:11px 16px}
+  .icon{opacity:.6;padding:8px 9px;font-size:15px}
+  .check{width:22px;height:22px}
+  .tag{padding:4px 10px;font-size:12px} .tag-add{padding:3px 9px;font-size:12px}
+  .item{padding:11px 2px;flex-wrap:wrap}
+  .cal{grid-template-columns:repeat(7,minmax(0,1fr))}
+  .cal .wk,.cal .dh:first-child{display:none}
+  .day{min-height:52px;padding:4px}
+  .day .ev,.day .more{display:none}
+  .day .dots{display:flex}
+  .bar{grid-template-columns:minmax(80px,1fr) minmax(50px,1.4fr) 110px}
+  .loan-row{grid-template-columns:minmax(0,1fr)}
+  .notes-wrap{grid-template-columns:minmax(0,1fr)}
+  .note-list{max-height:none}
+  textarea.notes,.note-view{min-height:55vh}
+  .hc{width:32px;height:32px}
+  .hname{min-width:130px}
+  .stat .num{font-size:20px}
+  .param-grid{grid-template-columns:minmax(0,1fr)} .range-scale{padding-right:0}
+  .toast{left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));max-width:calc(100% - 32px)}
+  .head .seg{width:100%;overflow-x:auto;flex-wrap:nowrap}
+  .seg button{white-space:nowrap}
+}

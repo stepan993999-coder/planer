@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self' https://*.supabase.co wss://*.supabase.co">
+<title>Планер</title>
+<link rel="stylesheet" href="src/styles.css">
+<link rel="stylesheet" href="src/sync.css">
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand"><i></i><span>Планер</span></div>
+    <nav id="nav"></nav>
+    <div class="side-foot"><button type="button" class="sync" data-sync data-act="syncMenu" data-s="busy"><b></b><span>Подключаюсь…</span></button><button type="button" data-act="folder">Открыть папку с данными</button></div>
+  </aside>
+  <main id="main"><div class="wrap"><p class="empty">Загрузка…</p></div></main>
+</div>
+<div class="drag" aria-hidden="true"></div>
+<div id="toast" class="toast" hidden></div>
+<script src="config.js"></script>
+<script src="vendor/supabase.js"></script>
+<script src="src/sync.js"></script>
+<script src="src/calc.js"></script>
+<script src="src/views-money.js"></script>
+<script src="src/app.js"></script>
+</body>
+</html>
