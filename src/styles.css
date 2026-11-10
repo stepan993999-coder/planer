@@ -361,3 +361,10 @@ a.nlink{color:var(--accent)}
 .wallet .kv b.wdebtv{color:var(--accent)}
 .day .dsum{font:600 10.5px var(--f-mono);color:var(--accent);padding:0 2px}
 .cchip{border:0;cursor:pointer;background:var(--accent-soft);color:var(--accent)}
+/* --- правки 2.4 --- */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+button,a,input,select,label,summary{touch-action:manipulation}
+.ds-s{display:none}
+.legend{flex-wrap:wrap;gap:4px 12px}
+.icon.sure{opacity:1;color:var(--bad);font-size:11px;font-weight:600;letter-spacing:.04em;white-space:nowrap;padding:4px 6px;border:1px solid var(--bad)}
+.ops-body{display:flex;flex-direction:column;gap:12px;min-width:0}

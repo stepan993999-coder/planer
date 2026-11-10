@@ -109,7 +109,11 @@ async function importData() {
   data = {};
   for (const k of KEYS) if (k in incoming) data[k] = incoming[k];
   flushSave();
-  win && win.webContents.reload();
+  if (win) {
+    // импортированные данные должны заменить облако, а не быть перезаписаны им при следующей сверке
+    try { await win.webContents.executeJavaScript("try{localStorage.setItem('planer-force-local','1')}catch(e){}"); } catch (e) {}
+    win.webContents.reload();
+  }
 }
 
 /* ---------- меню ---------- */

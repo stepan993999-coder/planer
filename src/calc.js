@@ -43,7 +43,7 @@ function compute(L,tx,catType,today,catDir){catDir=catDir||(t=>t.dir||"out");
   const plan=[];{let bal=loans.map(l=>+l.balance||0);
     for(let i=0;i<HORIZON;i++){const m=months[i];const f=fact[m];
       const ended=todayKey>m; // сегодня не раньше первого числа следующего месяца
-      const status=f.count>0&&ended?"факт":f.count>0?"идёт":"план";
+      const status=ended?"факт":f.count>0?"идёт":"план";   // закончившийся месяц — всегда факт, даже если платежей не было
       const left=Math.max(1,monthsBetween(m,L.target)+1);
       const totalStart=bal.reduce((a,b)=>a+b,0);
       let dev=i===0?totalStart-initTotal:totalStart-orig[i-1].endTotal;
@@ -58,9 +58,9 @@ function compute(L,tx,catType,today,catDir){catDir=catDir||(t=>t.dir||"out");
 
   /* учёт: долг по факту (из прошлого месяца + проценты − внесено, или остаток из приложения) */
   const acct=[];{let v=loans.map(l=>+l.balance||0);
-    for(let i=0;i<HORIZON;i++){const m=months[i];const f=fact[m];const ab=(L.appBal||{})[m]||{};
+    for(let i=0;i<HORIZON;i++){const m=months[i];const f=fact[m];const ab=(L.appBal||{})[m]||{};const p0=plan[i];
       v=v.map((x,j)=>typeof ab[loans[j].id]==="number"?ab[loans[j].id]:Math.max(0,x*(1+(+loans[j].rate||0)/12)-f.paid[j]));
-      const has=f.count>0;const debt=v.reduce((a,b)=>a+b,0);const p=plan[i];
+      const has=f.count>0||p0.status==="факт";const debt=v.reduce((a,b)=>a+b,0);const p=p0;
       let status="";if(p.status==="факт")status=debt<1?"долгов нет":debt>orig[i].endTotal+1000?"отстаёте":debt<orig[i].endTotal-1000?"опережаете":"по плану";else if(has)status="месяц идёт";
       const paid=f.paid.reduce((a,b)=>a+b,0);
       acct.push({month:m,has,count:f.count,inc:f.inc,obl:f.obl,oth:f.oth,paid:f.paid.slice(),paidTotal:paid,need:p.need,diff:paid-p.need,left:f.inc-f.obl-f.oth-paid,debt:f.debt,

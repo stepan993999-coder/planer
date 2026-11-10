@@ -24,7 +24,8 @@ function nice(s){if(!s)return"";const t=TODAY();if(s===t)return"Сегодня";
 function plural(n,a,b,c){n=Math.abs(n)%100;const m=n%10;if(n>10&&n<20)return c;if(m>1&&m<5)return b;if(m===1)return a;return c}
 function occurs(e,s){if(!e.date||s<e.date)return false;if(s===e.date)return true;const r=e.repeat;if(!r)return false;
   const a=D(e.date),b=D(s);if(r==="daily")return true;if(r==="weekly")return a.getDay()===b.getDay();
-  if(r==="monthly")return a.getDate()===b.getDate();if(r==="yearly")return a.getDate()===b.getDate()&&a.getMonth()===b.getMonth();return false}
+  const dom=Math.min(a.getDate(),new Date(b.getFullYear(),b.getMonth()+1,0).getDate());   // 31-е в коротком месяце — в его последний день
+  if(r==="monthly")return dom===b.getDate();if(r==="yearly")return dom===b.getDate()&&a.getMonth()===b.getMonth();return false}
 const eventsOn=s=>S.events.filter(e=>occurs(e,s)).sort((a,b)=>(a.time||"").localeCompare(b.time||""));
 
 /* ---------- деньги ---------- */
@@ -35,9 +36,7 @@ const CATS_OUT=["Продукты","Кафе и рестораны","Транс�
 const CATS_IN=["Зарплата","Фриланс","Подарки","Возврат","Прочее"];
 
 /* ---------- хранение ---------- */
-const pend={};
-function save(k){histRecord(k);clearTimeout(pend[k]);pend[k]=setTimeout(()=>{pend[k]=null;API.save(k,clone(S[k]))},250)}
-window.addEventListener("beforeunload",()=>{for(const k in pend)if(pend[k]){clearTimeout(pend[k]);API.save(k,clone(S[k]))}});
+function save(k){histRecord(k);API.save(k,clone(S[k]))}
 
 /* ---------- состояние интерфейса ---------- */
 const now=new Date();
@@ -52,7 +51,16 @@ function toast(msg,canUndo){const t=$("#toast");t.innerHTML=esc(msg)+(canUndo?' 
 
 /* ---------- отрисовка ---------- */
 let editing=false;
+const TOUCH=API.platform==="web"&&!!window.matchMedia&&matchMedia("(hover:none),(pointer:coarse)").matches;
+const RENAME_HINT=TOUCH?"Нажмите на название, чтобы переименовать":"Двойной щелчок по названию — переименовать";
+/* перерисовать, не теряя того, что уже набрано в формах (когда пришли данные с другого устройства) */
+function renderKeep(){const keep={};document.querySelectorAll("#main form[data-form] [id]").forEach(el=>{if(el.type!=="radio"&&el.type!=="checkbox"&&"value" in el)keep[el.id]=el.value});
+  const col=document.querySelector("#main form[data-form] input[name=color]:checked");const colv=col&&col.value;
+  render();
+  for(const id in keep){const el=document.getElementById(id);if(el&&el.value!==keep[id])el.value=keep[id]}
+  if(colv){const r=document.querySelector(`#main form[data-form] input[name=color][value="${colv}"]`);if(r)r.checked=true}}
 function render(){
+  editing=false;
   const ae=document.activeElement;const fid=ae&&ae.id&&$("#main").contains(ae)?ae.id:null;let selr=null;try{if(fid&&ae.selectionStart!=null)selr=[ae.selectionStart,ae.selectionEnd]}catch(e){}
   for(const k in LISTS){const t=ui.tag[k];if(t&&!LISTS[k]().some(x=>(x.tags||[]).includes(t)))ui.tag[k]=""}
   const v=ui.view;
@@ -83,15 +91,16 @@ const tRange=e=>e.time?(e.end?e.time+"–"+e.end:e.time):"";
 function taskTime(t){if(t.time&&t.dur)return t.time+"–"+addMin(t.time,t.dur);if(t.time)return t.time;if(t.dur)return "≈ "+fmtDur(t.dur);return ""}
 const DURS=[15,30,45,60,90,120,180,240,360,480];
 function durSelect(id,sel){const opts=[...DURS];if(sel&&!opts.includes(+sel))opts.push(+sel),opts.sort((a,b)=>a-b);return `<select ${id?`id="${id}"`:""} name="dur" aria-label="Сколько займёт"><option value="">длительность</option>${opts.map(m=>`<option value="${m}" ${+sel===m?"selected":""}>${fmtDur(m)}</option>`).join("")}</select>`}
-const costInput=id=>`<input id="${id}" type="number" name="cost" min="0" step="any" placeholder="Стоимость, ₽" style="width:120px" aria-label="Стоимость">`;
+const costInput=id=>`<input id="${id}" type="number" inputmode="decimal" name="cost" min="0" step="any" placeholder="Стоимость, ₽" style="width:120px" aria-label="Стоимость">`;
 const costOf=x=>+x.cost||0;
 function costChip(k,x){return costOf(x)?`<button type="button" class="chip cchip num" data-act="costEdit" data-k="${k}" data-id="${x.id}" title="Стоимость — нажмите, чтобы изменить">${money(costOf(x))}</button>`:`<button type="button" class="tag-add" data-act="costEdit" data-k="${k}" data-id="${x.id}" title="Указать стоимость">+₽</button>`}
-function dayCost(s){let n=0;for(const e of eventsOn(s))n+=costOf(e);for(const t of S.tasks)if(t.date===s)n+=costOf(t);return n}
+function dayCost(s){let n=0;for(const e of eventsOn(s))n+=costOf(e);for(const t of S.tasks)if(t.date===s&&!t.done)n+=costOf(t);return n}
+function shortMoney(v){v=Math.abs(v);const f=(x,u)=>(x>=10?String(Math.round(x)):String(Math.round(x*10)/10).replace(".",","))+u;return v>=1e6?f(v/1e6,"м"):v>=1000?f(v/1000,"к"):String(Math.round(v))}
 function timeChip(k,x){const txt=k==="tasks"?taskTime(x):tRange(x);return txt?`<button type="button" class="chip tchip num" data-act="timeEdit" data-k="${k}" data-id="${x.id}" title="Изменить время">${esc(txt)}</button>`:`<button type="button" class="tag-add" data-act="timeEdit" data-k="${k}" data-id="${x.id}" title="Указать время">+время</button>`}
 const tagInput=(id,ph)=>`<input id="${id}" type="text" name="tags" placeholder="${ph||"#теги"}" autocomplete="off" style="width:130px">`;
-const ed=(k,id,f)=>`data-edit="${k}|${id}|${f}" title="Двойной щелчок — изменить"`;
-function isEmpty(){return !S.tasks.length&&!S.events.length&&!S.finance.tx.length&&!S.goals.length&&!S.habits.length}
-function hasEx(){return S.tasks.some(x=>x.ex)||S.events.some(x=>x.ex)||S.finance.tx.some(x=>x.ex)||S.goals.some(x=>x.ex)||S.habits.some(x=>x.ex)}
+const ed=(k,id,f)=>`data-edit="${k}|${id}|${f}" title="${TOUCH?"Нажмите, чтобы изменить":"Двойной щелчок — изменить"}"`;
+function isEmpty(){return !S.tasks.length&&!S.events.length&&!S.finance.tx.length&&!S.goals.length}
+function hasEx(){return S.tasks.some(x=>x.ex)||S.events.some(x=>x.ex)||S.finance.tx.some(x=>x.ex)||S.goals.some(x=>x.ex)}
 
 function taskRow(t,showDate=true){
   const td=TODAY();let dc="";
@@ -122,7 +131,9 @@ function vOverview(){
   const yearDays=Math.round((new Date(d.getFullYear(),11,31)-new Date(d.getFullYear(),0,0))/864e5);
   const due=S.tasks.filter(t=>!t.done&&t.date&&t.date<=td).sort(sortTasks);
   const doneToday=S.tasks.filter(t=>t.done&&t.date===td).length;const planned=due.filter(t=>t.date===td).reduce((a,t)=>a+(+t.dur||0),0);
-  const evs=[];for(let i=0;i<=7&&evs.length<7;i++){const s=ymd(addDays(d,i));for(const e of eventsOn(s))evs.push({e,s})}
+  const wk=[];let wkCost=0;   // события и платные задачи на сегодня и 6 дней вперёд — список и сумма считаются по одним и тем же дням
+  for(let i=0;i<7;i++){const s=ymd(addDays(d,i));for(const e of eventsOn(s)){wk.push({e,s});wkCost+=costOf(e)}for(const t of S.tasks.filter(t=>t.date===s&&!t.done&&costOf(t)).sort(sortTasks)){wk.push({t,s});wkCost+=costOf(t)}}
+  const WKMAX=8;
     const goals=S.goals.slice(0,4);
   let html=`<div class="head"><div><div class="eyebrow">${esc(wd)} · неделя ${isoWeek(d)} · день ${dayOfYear(d)} из ${yearDays}</div><div class="today-big">${esc(dm)}</div></div>
   ${hasEx()?'<button class="btn" data-act="clearEx">Убрать примеры</button>':""}</div>`;
@@ -131,8 +142,9 @@ function vOverview(){
   <section class="panel span2"><div class="panel-h"><h2>На сегодня${planned?` · запланировано ${fmtDur(planned)}`:""}</h2><a href="#" data-act="go" data-v="tasks">Все задачи →</a></div>
     <form class="row" data-form="quickTask"><input id="qt" type="text" class="grow" name="title" placeholder="Новая задача на сегодня${API.platform==="web"?"":"  (⌘N)"}" required autocomplete="off"><input id="qt-time" type="time" name="time" aria-label="Время начала">${durSelect("qt-dur")}${prioSelect("qt-prio")}${costInput("qt-cost")}<button class="btn pri">Добавить</button></form>
     <div class="list">${due.length?due.map(t=>taskRow(t)).join(""):`<p class="empty">${doneToday?"Всё на сегодня сделано.":"Задач на сегодня нет."}</p>`}</div></section>
-  <section class="panel"><div class="panel-h"><h2>Ближайшие 7 дней${(()=>{let c=0;for(let i=0;i<7;i++)c+=dayCost(ymd(addDays(new Date(),i)));return c?" · "+money(c):""})()}</h2><a href="#" data-act="go" data-v="calendar">Календарь →</a></div>
-    <div class="list">${evs.length?evs.map(({e,s})=>`<div class="item"><span class="dot" style="--ec:var(--${e.color||"c1"})"></span><span class="t">${esc(e.title)}${exTag(e)}</span><span class="chip ${s===td?"today":""}">${nice(s)}${e.time?" · "+esc(tRange(e)):""}</span>${costOf(e)?`<span class="chip cchip num">${money(costOf(e))}</span>`:""}<button class="icon" data-act="del" data-k="events" data-id="${e.id}" aria-label="Удалить">✕</button></div>`).join(""):'<p class="empty">Событий на неделе нет.</p>'}</div></section>
+  <section class="panel"><div class="panel-h"><h2>Ближайшие 7 дней${wkCost?" · "+money(wkCost):""}</h2><a href="#" data-act="go" data-v="calendar">Календарь →</a></div>
+    <div class="list">${wk.length?wk.slice(0,WKMAX).map(({e,t,s})=>e?`<div class="item"><span class="dot" style="--ec:var(--${e.color||"c1"})"></span><span class="ibody"><span class="t">${esc(e.title)}${exTag(e)}</span><span class="meta"><span class="chip ${s===td?"today":""}">${nice(s)}${e.time?" · "+esc(tRange(e)):""}</span>${costOf(e)?`<span class="chip cchip num">${money(costOf(e))}</span>`:""}</span></span><button class="icon" data-act="del" data-k="events" data-id="${e.id}" aria-label="Удалить${e.repeat?" все повторы":""}">✕</button></div>`
+      :`<div class="item"><span class="dot" style="--ec:var(--muted)"></span><span class="ibody"><span class="t">${esc(t.title)}${exTag(t)}</span><span class="meta"><span class="chip">задача</span><span class="chip ${s===td?"today":""}">${nice(s)}${t.time?" · "+esc(t.time):""}</span><span class="chip cchip num">${money(costOf(t))}</span></span></span></div>`).join("")+(wk.length>WKMAX?`<span class="hint">И ещё ${wk.length-WKMAX} — в календаре.</span>`:""):'<p class="empty">На неделю ничего не запланировано.</p>'}</div></section>
   ${M.overviewTx()}
   ${M.overviewMoney()}
   <section class="panel"><div class="panel-h"><h2>Цели</h2><a href="#" data-act="go" data-v="goals">Все цели →</a></div>
@@ -165,7 +177,7 @@ function vTasks(){
      <datalist id="lists">${lists.map(l=>`<option value="${esc(l)}">`).join("")}</datalist>
      <button class="btn pri">Добавить</button>
    </form>
-   <div class="panel-h"><div class="seg" role="group" aria-label="Фильтр">${filters.map(([id,n])=>`<button type="button" data-act="tf" data-f="${id}" aria-pressed="${f===id}">${n}</button>`).join("")}</div><span class="hint">Двойной щелчок по задаче — переименовать</span></div>
+   <div class="panel-h"><div class="seg" role="group" aria-label="Фильтр">${filters.map(([id,n])=>`<button type="button" data-act="tf" data-f="${id}" aria-pressed="${f===id}">${n}</button>`).join("")}</div><span class="hint">${RENAME_HINT}</span></div>
    ${tagBar("tasks")}
    <div class="list">${list.length?list.map(t=>taskRow(t)).join(""):'<p class="empty">Здесь пусто.</p>'}</div>
   </section>`}
@@ -181,7 +193,7 @@ function vCalendar(){
     for(let i=0;i<7;i++){const d=addDays(ws,i),s=ymd(d);
       const ev=eventsOn(s).filter(e=>byTag("events",e));const tk=S.tasks.filter(t=>t.date===s&&!t.done).sort(sortTasks);
       const items=[...ev.map(e=>`<span class="ev" style="--ec:var(--${e.color||"c1"})">${e.time?esc(tRange(e))+" ":""}${esc(e.title)}${costOf(e)?" · "+money(costOf(e)):""}</span>`),...tk.map(t=>`<span class="ev task p-${t.prio||"mid"}" title="Приоритет: ${PRIO_NAME[t.prio||"mid"]}">☐ ${t.time?esc(t.time)+" ":""}${esc(t.title)}</span>`)];
-      cells+=`<button type="button" class="day ${d.getMonth()!==m?"out":""} ${s===td?"is-today":""} ${s===ui.calSel?"sel":""}" data-act="calDay" data-d="${s}" aria-label="${d.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}"><span class="n">${d.getDate()}</span>${(()=>{const c=dayCost(s);return c?`<span class="dsum num">${money(c)}</span>`:""})()}${items.slice(0,3).join("")}${items.length>3?`<span class="more">ещё ${items.length-3}</span>`:""}<span class="dots">${[...ev.map(e=>`<span class="dot" style="--ec:var(--${e.color||"c1"})"></span>`),...tk.map(()=>'<span class="dot" style="--ec:var(--muted)"></span>')].slice(0,4).join("")}</span></button>`}
+      cells+=`<button type="button" class="day ${d.getMonth()!==m?"out":""} ${s===td?"is-today":""} ${s===ui.calSel?"sel":""}" data-act="calDay" data-d="${s}" aria-label="${d.toLocaleDateString("ru-RU",{day:"numeric",month:"long"})}"><span class="n">${d.getDate()}</span>${(()=>{const c=dayCost(s);return c?`<span class="dsum num"><span class="ds-f">${money(c)}</span><span class="ds-s">${shortMoney(c)}</span></span>`:""})()}${items.slice(0,3).join("")}${items.length>3?`<span class="more">ещё ${items.length-3}</span>`:""}<span class="dots">${[...ev.map(e=>`<span class="dot" style="--ec:var(--${e.color||"c1"})"></span>`),...tk.map(()=>'<span class="dot" style="--ec:var(--muted)"></span>')].slice(0,4).join("")}</span></button>`}
   }
   const sel=ui.calSel,sd=D(sel);
   const sev=eventsOn(sel);
@@ -203,7 +215,7 @@ function vCalendar(){
          <select id="e-rep" name="repeat" aria-label="Повтор">${Object.entries(REPEAT).map(([k,v])=>`<option value="${k}">${v}</option>`).join("")}</select></div>
        <div style="display:flex;gap:8px;align-items:center"><span class="colors" role="radiogroup" aria-label="Цвет">${["c1","c2","c3","c4"].map((c,i)=>`<label><input type="radio" name="color" value="${c}" ${i===0?"checked":""}><span style="--ec:var(--${c})"></span></label>`).join("")}</span>
        <button class="btn pri" style="margin-left:auto">Добавить</button></div>
-       <span class="hint">Событие со временем напомнит о себе уведомлением за 10 минут.</span>
+       ${API.platform==="web"?"":'<span class="hint">Событие со временем напомнит о себе уведомлением за 10 минут.</span>'}
      </form>
      <h2>Задачи на день</h2>
      <div class="list">${stk.length?stk.map(t=>taskRow(t,false)).join(""):'<p class="empty">Нет задач.</p>'}</div>
@@ -274,11 +286,12 @@ function vNotes(){const items=S.notes.items||[];
   <div class="notes-wrap"><div class="note-list">${list.length?list.map(n=>`<div class="note-card ${sel&&sel.id===n.id?"on":""}" data-act="noteSel" data-id="${n.id}"><div class="panel-h"><b class="t">${esc(noteTitle(n))}</b><button class="icon" data-act="del" data-k="notes" data-id="${n.id}" aria-label="Удалить заметку">✕</button></div>${noteSnip(n)?`<span class="hint">${esc(noteSnip(n))}</span>`:""}<span class="meta">${linkCount(n)?`<span class="chip">${linkCount(n)} ${plural(linkCount(n),"ссылка","ссылки","ссылок")}</span>`:""}${tagChips("notes",n)}</span></div>`).join(""):`<p class="empty">${items.length?"Нет заметок с этим тегом.":"Заметок пока нет."}</p>`}</div>
   <div class="note-ed">${sel?(ui.noteEdit===sel.id?`<div class="note-bar"><span class="hint">Редактирование. Ссылки станут активными после «Готово».</span><button type="button" class="btn sm pri" data-act="noteDone">Готово</button></div><textarea id="notes" class="notes" data-id="${sel.id}" placeholder="Первая строка станет названием заметки. Сохраняется автоматически." aria-label="Текст заметки" spellcheck="true">${esc(sel.text)}</textarea>`:`<div class="note-bar"><span class="hint">Ссылки открываются в браузере. Нажмите на текст, чтобы изменить.</span><button type="button" class="btn sm" data-act="noteEdit" data-id="${sel.id}">Изменить</button></div><div class="note-view" data-act="noteEdit" data-id="${sel.id}" tabindex="0" role="button" aria-label="Текст заметки, нажмите чтобы изменить">${sel.text?linkify(sel.text):'<span class="hint">Пустая заметка. Нажмите, чтобы писать.</span>'}</div>`):'<p class="empty">Нажмите «Новая заметка», чтобы начать.</p>'}</div></div>`}
 
-const M=window.PlanerMoney({S,ui,esc,money,pad,D,TODAY,MONTHS,ymd,exTag,plural,save,render:(...a)=>render(...a),toast,snapshotFor,uid,tagChips,tagBar,byTag,parseTags,tagInput});
+const M=window.PlanerMoney({S,ui,esc,money,pad,D,TODAY,MONTHS,ymd,exTag,plural,save,render:(...a)=>render(...a),toast,snapshotFor,uid,tagChips,tagBar,byTag,parseTags,tagInput,TOUCH,RENAME_HINT});
 /* ---------- действия ---------- */
 function find(k,id){return S[k].find(x=>x.id===id)}
 document.addEventListener("click",e=>{
   if(e.target.closest("a.nlink"))return;
+  if(TOUCH&&!e.target.closest("[data-act],input,select,button")&&startEdit(e.target))return;
   const a=e.target.closest("[data-act]");if(!a)return;const act=a.dataset.act,id=a.dataset.id;
   if(a.tagName==="A")e.preventDefault();
   if(M.onClick(act,a))return;
@@ -286,7 +299,9 @@ document.addEventListener("click",e=>{
     case "go":go(a.dataset.v);break;
     case "folder":API.openDataFolder();break;
     case "toggleTask":{const t=find("tasks",id);if(t){t.done=a.checked;save("tasks");render()}break}
-    case "del":{const k=a.dataset.k;if(k==="notes"){snapshotFor("notes");S.notes.items=S.notes.items.filter(x=>x.id!==id);save("notes");render();toast("Заметка удалена",true);break}snapshotFor(k);S[k]=S[k].filter(x=>x.id!==id);save(k);render();toast("Удалено",true);break}
+    case "del":{const k=a.dataset.k;
+      if(k==="events"){const ev=find("events",id);if(ev&&ev.repeat&&a.dataset.sure!=="1"){a.dataset.sure="1";a.classList.add("sure");a.textContent="Удалить все повторы?";toast("Это повторяющееся событие: удалятся все его повторы. Нажмите ещё раз, чтобы подтвердить");break}}
+      if(k==="notes"){snapshotFor("notes");S.notes.items=S.notes.items.filter(x=>x.id!==id);save("notes");render();toast("Заметка удалена",true);break}snapshotFor(k);S[k]=S[k].filter(x=>x.id!==id);save(k);render();toast("Удалено",true);break}
     case "delTx":{snapshotFor("finance");S.finance.tx=S.finance.tx.filter(x=>x.id!==id);save("finance");render();toast("Операция удалена",true);break}
     case "undo":{if(undoState){S[undoState.k]=undoState.v;save(undoState.k);undoState=null;render()}$("#toast").hidden=true;break}
     case "clearDone":{snapshotFor("tasks");S.tasks=S.tasks.filter(t=>!t.done);save("tasks");render();toast("Выполненные удалены",true);break}
@@ -302,11 +317,11 @@ document.addEventListener("click",e=>{
     case "habit":{const h=find("habits",id);if(h){const d=a.dataset.d;if(hT(h)===1&&(h.mode||"min")==="min")habitAdd(id,d,hv(h,d)?-1:1);else habitAdd(id,d,1)}break}
     case "hPlus":habitAdd(id,TODAY(),1);break;
     case "prioCycle":{const t=find("tasks",id);if(t){const seq=["mid","high","low"];t.prio=seq[(seq.indexOf(t.prio||"mid")+1)%3];save("tasks");render();toast("Приоритет: "+PRIO_NAME[t.prio])}break}
-    case "timeEdit":{const k=a.dataset.k;const x=LISTS[k]().find(i=>i.id===id);if(!x)break;const box=document.createElement("span");box.className="time-edit";
+    case "timeEdit":{const k=a.dataset.k;const x=LISTS[k]().find(i=>i.id===id);if(!x||editing)break;const box=document.createElement("span");box.className="time-edit";
       box.innerHTML=(k==="tasks"?`<input type="time" class="te-a" value="${x.time||""}" aria-label="Время начала">${durSelect("",x.dur)}`:`<input type="time" class="te-a" value="${x.time||""}" aria-label="Начало"><span>–</span><input type="time" class="te-b" value="${x.end||""}" aria-label="Окончание">`)+`<button type="button" class="btn sm pri" data-act="timeSave" data-k="${k}" data-id="${id}">OK</button>`;
       a.replaceWith(box);editing=true;box.querySelector("input").focus();break}
     case "costEdit":{const k=a.dataset.k;const x=LISTS[k]().find(i=>i.id===id);if(!x||editing)break;const box=document.createElement("span");box.className="time-edit";
-      box.innerHTML=`<input type="number" min="0" step="any" class="ce-v" value="${costOf(x)||""}" placeholder="₽" style="width:100px" aria-label="Стоимость"><button type="button" class="btn sm pri" data-act="costSave" data-k="${k}" data-id="${id}">OK</button>`;
+      box.innerHTML=`<input type="number" inputmode="decimal" min="0" step="any" class="ce-v" value="${costOf(x)||""}" placeholder="₽" style="width:100px" aria-label="Стоимость"><button type="button" class="btn sm pri" data-act="costSave" data-k="${k}" data-id="${id}">OK</button>`;
       a.replaceWith(box);editing=true;box.querySelector("input").focus();break}
     case "costSave":{const k=a.dataset.k;const x=LISTS[k]().find(i=>i.id===id);const box=a.closest(".time-edit");editing=false;
       if(x&&box){x.cost=Math.max(0,parseFloat(String(box.querySelector(".ce-v").value).replace(",","."))||0);save(SAVEKEY[k])}render();break}
@@ -324,23 +339,22 @@ document.addEventListener("click",e=>{
     case "seed":seed();break;
     case "clearEx":{S.tasks=S.tasks.filter(x=>!x.ex);S.events=S.events.filter(x=>!x.ex);S.finance.tx=S.finance.tx.filter(x=>!x.ex);S.goals=S.goals.filter(x=>!x.ex);S.habits=S.habits.filter(x=>!x.ex);
       if(S.finance.exBudgets){for(const c of S.finance.exBudgets)delete S.finance.budgets[c];delete S.finance.exBudgets}
+      S.finance.cats=(S.finance.cats||[]).filter(c=>!c.ex||S.finance.tx.some(t=>t.cat===c.name));for(const c of S.finance.cats)delete c.ex;
       for(const k of["tasks","events","finance","goals","habits"])save(k);render();toast("Примеры убраны");break}
   }
 });
-/* двойной щелчок — переименовать */
-document.addEventListener("dblclick",e=>{
-  const cr=e.target.closest("[data-catrename]");
-  if(cr&&!editing){editing=true;const i=+cr.dataset.catrename;const inp=document.createElement("input");inp.type="text";inp.className="inline-edit";inp.value=cr.textContent;cr.replaceWith(inp);inp.focus();inp.select();
-    let done=false;const fin=ok=>{if(done)return;done=true;editing=false;if(ok)M.renameCat(i,inp.value);render()};
-    inp.addEventListener("keydown",ev=>{if(ev.key==="Enter")fin(true);if(ev.key==="Escape")fin(false)});inp.addEventListener("blur",()=>fin(true));return}
-  const el=e.target.closest("[data-edit]");if(!el||editing)return;
-  const [k,id,field]=el.dataset.edit.split("|");const item=find(k,id);if(!item)return;
-  editing=true;const inp=document.createElement("input");inp.type="text";inp.className="inline-edit";inp.value=item[field];
-  el.replaceWith(inp);inp.focus();inp.select();
-  let done=false;const finish=ok=>{if(done)return;done=true;editing=false;const v=inp.value.trim();if(ok&&v&&v!==item[field]){item[field]=v;save(k)}render()};
-  inp.addEventListener("keydown",ev=>{if(ev.key==="Enter")finish(true);if(ev.key==="Escape")finish(false)});
-  inp.addEventListener("blur",()=>finish(true));
-});
+/* переименование: двойной щелчок на Mac, одно касание на iPhone */
+function inlineInput(el,value,done){editing=true;const inp=document.createElement("input");inp.type="text";inp.className="inline-edit";inp.value=value;inp.enterKeyHint="done";
+  el.replaceWith(inp);inp.focus();if(!TOUCH)inp.select();
+  let fin=false;const finish=ok=>{if(fin)return;fin=true;editing=false;done(ok,inp.value);render()};
+  inp.addEventListener("keydown",ev=>{if(ev.key==="Enter")finish(true);if(ev.key==="Escape")finish(false)});inp.addEventListener("blur",()=>finish(true))}
+function startEdit(target){
+  const cr=target.closest("[data-catrename]");
+  if(cr){if(!editing){const i=+cr.dataset.catrename;inlineInput(cr,cr.textContent,(ok,v)=>{if(ok)M.renameCat(i,v)})}return true}
+  const el=target.closest("[data-edit]");if(!el)return false;if(editing)return true;
+  const [k,id,field]=el.dataset.edit.split("|");const item=find(k,id);if(!item)return false;
+  inlineInput(el,item[field],(ok,val)=>{const v=val.trim();if(ok&&v&&v!==item[field]){item[field]=v;save(k)}});return true}
+document.addEventListener("dblclick",e=>{if(!TOUCH)startEdit(e.target)});
 document.addEventListener("change",e=>{
   const t=e.target;
   if(M.onChange(t))return;
@@ -354,7 +368,6 @@ document.addEventListener("keydown",e=>{if(e.target.classList&&e.target.classLis
 document.addEventListener("keydown",e=>{const box=e.target.closest&&e.target.closest(".time-edit");if(!box)return;if(e.key==="Enter"){e.preventDefault();box.querySelector('[data-act="timeSave"],[data-act="costSave"]').click()}if(e.key==="Escape"){editing=false;render()}});
 document.addEventListener("input",e=>{
   if(M.onInput(e.target))return;
-  if(e.target.id==="fin-q"){ui.finQ=e.target.value;render();return}
   if(e.target.id==="notes"){const n=(S.notes.items||[]).find(x=>x.id===e.target.dataset.id);if(!n)return;n.text=e.target.value;n.updated=Date.now();
     const c=document.querySelector(`.note-card[data-id="${n.id}"] .t`);if(c)c.textContent=noteTitle(n);
     clearTimeout(notesT);notesT=setTimeout(()=>save("notes"),500)}});
@@ -388,7 +401,7 @@ function checkReminders(){
     if(diff<=10&&diff>=0&&!notified.has(key)){notified.add(key);API.notify(e.title,diff===0?"Начинается сейчас"+(e.end?", до "+e.end:""):`Через ${diff} ${plural(diff,"минуту","минуты","минут")}, ${e.end?"с "+e.time+" до "+e.end:"в "+e.time}`)}}
 }
 let lastDay=TODAY();
-setInterval(()=>{checkReminders();if(TODAY()!==lastDay){lastDay=TODAY();if(!editing&&!document.activeElement.matches("input,textarea"))render()}},30000);
+setInterval(()=>{checkReminders();if(TODAY()!==lastDay){lastDay=TODAY();if(!typing())renderKeep()}},30000);
 
 /* ---------- пример ---------- */
 function seed(){
@@ -400,12 +413,11 @@ function seed(){
   S.events.push(E("Созвон с командой",d(0),"11:00","c1","weekly"),E("Тренировка",d(1),"19:30","c2"),E("День рождения мамы",d(5),"","c4","yearly"),E("Сдать отчёт",d(3),"18:00","c3"),E("Кино с друзьями",d(-4),"20:00","c4"));
   const X=(type,amount,cat,day,note,pay)=>({id:uid(),type,amount,cat,date:p+pad(day),note,pay:pay||"Карта",ex:true});
   const today=new Date().getDate();const dd=n=>Math.max(1,Math.min(today,n));
-  S.finance.tx.push(X("out",1200,"Продукты",dd(2),"Пример покупки"),X("out",900,"Доставка еды и кафе",dd(3),"Пример обеда","Наличные"));
-  const G=(title,target,current,unit,deadline)=>({id:uid(),title,target,current,unit,deadline,ex:true});
+  S.finance.tx.push(X("out",1200,"Продукты",dd(2),"Пример покупки"),X("out",900,"Кафе и рестораны",dd(3),"Пример обеда","Наличные"));
+  for(const n of["Продукты","Кафе и рестораны"])if(!S.finance.cats.some(c=>c.name===n))S.finance.cats.push({name:n,type:"Другой",plan:0,note:"",ex:true});
+  const G=(title,target,current,unit,deadline)=>({id:uid(),title,start:0,target,current,unit,deadline,tags:[],ex:true});
   S.goals.push(G("Прочитать книги за год",24,17,"книг",new Date().getFullYear()+"-12-31"),G("Подушка безопасности",300000,185000,"₽",d(120)),G("Пробежать за месяц",80,26,"км",d(27)));
-  const hd=pattern=>{const o={};pattern.forEach((v,i)=>{if(v)o[d(-(pattern.length-1-i))]=true});return o};
-  S.habits.push({id:uid(),name:"Зарядка 15 минут",days:hd([1,1,0,1,1,1,0,1,1,1,1,0,1,1,1,0,1,1,1,1,0]),ex:true},{id:uid(),name:"Читать 20 страниц",days:hd([0,1,1,1,0,1,1,0,1,1,0,1,1,1,0,1,1,1,1,0,0]),ex:true},{id:uid(),name:"2 литра воды",days:hd([1,1,0,1,1,0,1,1,1,1,1,0,1,1,1,1,1,0,1,1,1]),ex:true});
-  for(const k of["tasks","events","finance","goals","habits"])save(k);render();
+  for(const k of["tasks","events","finance","goals"])save(k);render();
 }
 
 /* ---------- старт ---------- */
@@ -419,8 +431,8 @@ API.load().then(data=>{
 /* обновления с другого устройства (синхронизация) */
 let remotePending=false;
 const typing=()=>{const ae=document.activeElement;if(editing)return true;if(!ae||!$("#main").contains(ae))return false;if(ae.tagName==="TEXTAREA")return true;return ae.tagName==="INPUT"&&/^(text|search|number|email|password|tel|url)$/.test(ae.type)&&ae.value!==""&&ae.dataset.goal===undefined&&!/^ln-budget/.test(ae.id)};
-if(API.onRemote)API.onRemote((k,v)=>{if(!(k in KEYS)||v==null)return;histRemote(k,v);S[k]=Array.isArray(KEYS[k])?clone(v):Object.assign(clone(KEYS[k]),clone(v));if(typing()){remotePending=true;return}render()});
-document.addEventListener("focusout",()=>setTimeout(()=>{if(remotePending&&!typing()){remotePending=false;render()}},80));
+if(API.onRemote)API.onRemote((k,v)=>{if(!(k in KEYS)||v==null)return;histRemote(k,v);S[k]=Array.isArray(KEYS[k])?clone(v):Object.assign(clone(KEYS[k]),clone(v));if(typing()){remotePending=true;return}renderKeep()});
+document.addEventListener("focusout",()=>setTimeout(()=>{if(remotePending&&!typing()){remotePending=false;renderKeep()}},80));
 /* ---------- история изменений: ⌘Z — отменить, ⇧⌘Z — повторить ---------- */
 var HIST={undo:[],redo:[],base:{},last:{k:null,t:0},busy:false};
 const HNAME={tasks:"Задачи",events:"Календарь",finance:"Финансы",goals:"Цели",habits:"Привычки",notes:"Заметки",loans:"Кредиты"};
@@ -432,7 +444,7 @@ function histRemote(k,v){HIST.base[k]=JSON.stringify(v);HIST.undo=HIST.undo.filt
 function histStep(from,to,word){const e=from.pop();if(!e){toast(word==="Отменено"?"Нечего отменять":"Нечего повторять");return}
   to.push({k:e.k,prev:JSON.stringify(S[e.k])});HIST.busy=true;
   const v=JSON.parse(e.prev);S[e.k]=Array.isArray(KEYS[e.k])?v:Object.assign(clone(KEYS[e.k]),v);HIST.base[e.k]=e.prev;HIST.last={k:null,t:0};
-  clearTimeout(pend[e.k]);pend[e.k]=null;API.save(e.k,clone(S[e.k]));HIST.busy=false;editing=false;render();toast(`${word}: изменение в разделе «${HNAME[e.k]||e.k}»`)}
+  API.save(e.k,clone(S[e.k]));HIST.busy=false;editing=false;render();toast(`${word}: изменение в разделе «${HNAME[e.k]||e.k}»`)}
 const histUndo=()=>histStep(HIST.undo,HIST.redo,"Отменено");
 const histRedo=()=>histStep(HIST.redo,HIST.undo,"Повторено");
 const isTextField=t=>t&&(t.tagName==="TEXTAREA"||t.isContentEditable||(t.tagName==="INPUT"&&/^(text|search|number|email|password|tel|url)$/.test(t.type)));

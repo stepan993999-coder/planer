@@ -1,7 +1,7 @@
 /* Разделы «Финансы» и «Кредиты». Подключается из app.js через window.PlanerMoney(ctx). */
 window.PlanerMoney=function(ctx){
 "use strict";
-const {S,ui,esc,money,pad,D,TODAY,MONTHS,ymd,exTag,plural,save,render,toast,snapshotFor,uid,tagChips,tagBar,byTag,parseTags,tagInput}=ctx;
+const {S,ui,esc,money,pad,D,TODAY,MONTHS,ymd,exTag,plural,save,render,toast,snapshotFor,uid,tagChips,tagBar,byTag,parseTags,tagInput,TOUCH,RENAME_HINT}=ctx;
 const C=window.PlanerCalc;
 const TYPES=["Доход","Обязательный","Кредит","Другой","Долг"];
 const TYPE_CHIP={"Доход":"ok","Обязательный":"warn","Кредит":"late","Другой":"","Долг":"debt"};
@@ -56,10 +56,10 @@ function vFinance(){
   rows.sort((a,b)=>b.v-a.v||b.l-a.l);
   const max=Math.max(1,...rows.map(r=>Math.max(r.v,r.l)));
   const tab=ui.finTab||"month";
-  return `<div class="head"><div><div class="eyebrow">${y} · дневник доходов и расходов</div><h1>Финансы: ${MONTHS[m].toLowerCase()}</h1></div>
+  return `<div class="head"><div><div class="eyebrow">${y} · дневник доходов и расходов</div><h1>Финансы: ${tab==="year"?yearY()+" год":MONTHS[m].toLowerCase()}</h1></div>
    <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
    <div class="seg" role="group" aria-label="Вид"><button type="button" data-act="finTab" data-t="month" aria-pressed="${tab==="month"}">Месяц</button><button type="button" data-act="finTab" data-t="year" aria-pressed="${tab==="year"}">Сводка за год</button><button type="button" data-act="finTab" data-t="cats" aria-pressed="${tab==="cats"}">Категории</button></div>
-   ${tab==="month"?`<button class="btn" data-act="finPrev" aria-label="Предыдущий месяц">←</button><button class="btn" data-act="finNow">Этот месяц</button><button class="btn" data-act="finNext" aria-label="Следующий месяц">→</button>`:""}</div></div>
+   ${tab==="month"?`<button class="btn" data-act="finPrev" aria-label="Предыдущий месяц">←</button><button class="btn" data-act="finNow">Этот месяц</button><button class="btn" data-act="finNext" aria-label="Следующий месяц">→</button>`:tab==="year"?`<button class="btn" data-act="yearPrev" aria-label="Предыдущий год">←</button><button class="btn" data-act="yearNow">Этот год</button><button class="btn" data-act="yearNext" aria-label="Следующий год">→</button>`:""}</div></div>
   ${tab==="year"?vYear():tab==="cats"?vCats():`
   <div class="stats s5">
    <div class="stat"><small>Доходы</small><span class="num pos">${rub(f.inc)}</span></div>
@@ -83,25 +83,30 @@ function opsSection(p){
   if(ft)list=list.filter(t=>catType(t.cat)===ft);
   list=list.filter(t=>byTag("tx",t));
   if(q)list=list.filter(t=>[t.cat,t.note,t.pay,(t.tags||[]).map(x=>"#"+x).join(" "),String(t.amount)].join(" ").toLowerCase().includes(q));
-  const cmp={"date-desc":(a,b)=>b.date.localeCompare(a.date)||(b.id>a.id?1:-1),"date-asc":(a,b)=>a.date.localeCompare(b.date),"sum-desc":(a,b)=>b.amount-a.amount,"sum-asc":(a,b)=>a.amount-b.amount,"cat":(a,b)=>a.cat.localeCompare(b.cat,"ru")||b.date.localeCompare(a.date)}[so]||((a,b)=>0);
+  const ord=new Map(S.finance.tx.map((t,i)=>[t.id,i]));const o=t=>ord.get(t.id)||0;   // в пределах дня — в порядке ввода
+  const cmp={"date-desc":(a,b)=>b.date.localeCompare(a.date)||o(b)-o(a),"date-asc":(a,b)=>a.date.localeCompare(b.date)||o(a)-o(b),"sum-desc":(a,b)=>b.amount-a.amount,"sum-asc":(a,b)=>a.amount-b.amount,"cat":(a,b)=>a.cat.localeCompare(b.cat,"ru")||b.date.localeCompare(a.date)}[so]||((a,b)=>0);
   list.sort(cmp);
   let sIn=0,sOut=0,sD=0;for(const t of list){const ty=catType(t.cat);if(ty==="Перевод")continue;if(ty==="Доход")sIn+=+t.amount;else if(ty==="Долг")sD+=(txDir(t)==="in"?1:-1)*(+t.amount||0);else sOut+=+t.amount}
   const filtered=!!(q||fc||ft||ui.tag.tx);
   const used=[...new Set(S.finance.tx.map(t=>t.cat))].filter(n=>!cats().some(c=>c.name===n));
   const catSel=`<select id="fin-cat" aria-label="Категория"><option value="">Все категории</option>${TYPES.map(ty=>{const l=cats().filter(c=>c.type===ty).sort(byName);return l.length?`<optgroup label="${ty}">${l.map(c=>`<option ${c.name===fc?"selected":""}>${esc(c.name)}</option>`).join("")}</optgroup>`:""}).join("")}${used.map(n=>`<option ${n===fc?"selected":""}>${esc(n)}</option>`).join("")}</select>`;
-  return `<section class="panel"><div class="panel-h"><h2>Операции ${scope==="all"?"за всё время":"за месяц"} · ${list.length}</h2>
+  return `<section class="panel"><div class="panel-h"><h2 id="ops-count">Операции ${scope==="all"?"за всё время":"за месяц"} · ${list.length}</h2>
     <div class="seg" role="group" aria-label="Период"><button type="button" data-act="finScope" data-v="month" aria-pressed="${scope==="month"}">Этот месяц</button><button type="button" data-act="finScope" data-v="all" aria-pressed="${scope==="all"}">Всё время</button></div></div>
    <div class="filters"><input id="fin-q" type="search" placeholder="Поиск: категория, комментарий, #тег, сумма" value="${esc(ui.finQ||"")}" class="grow" autocomplete="off">
     ${catSel}
     <select id="fin-type" aria-label="Тип"><option value="">Все типы</option>${TYPES.map(t=>`<option ${t===ft?"selected":""}>${t}</option>`).join("")}</select>
     <select id="fin-sort" aria-label="Сортировка">${[["date-desc","Сначала новые"],["date-asc","Сначала старые"],["sum-desc","Сумма: по убыванию"],["sum-asc","Сумма: по возрастанию"],["cat","По категории"]].map(([v,l])=>`<option value="${v}" ${so===v?"selected":""}>${l}</option>`).join("")}</select>
-    ${filtered?'<button class="btn" data-act="finReset">Сбросить</button>':""}</div>
-   ${tagBar("tx")}
+    <span id="ops-reset">${filtered?'<button class="btn" data-act="finReset">Сбросить</button>':""}</span></div>
+   <div id="ops-body" class="ops-body">${tagBar("tx")}
    ${filtered&&list.length?`<p class="hint" style="margin:0">Найдено ${list.length}: доходы ${rub(sIn)}, расходы ${rub(sOut)}${sD?", долги "+money(sD,true):""}</p>`:""}
-   ${list.length?`<div class="tbl-wrap"><table><thead><tr><th>Дата</th><th>Категория</th><th>Тип</th><th>Способ</th><th>Комментарий</th><th>Теги</th><th class="r">Сумма</th><th></th></tr></thead><tbody>
-   ${list.map(t=>{if(t.cat===TRANSFER)return trRow(t,scope);const ty=catType(t.cat);const inc=ty==="Доход"||(ty==="Долг"&&txDir(t)==="in");const dcls=ty==="Долг"?"debtv":inc?"pos":"neg";const known=cats().some(c=>c.name===t.cat);return `<tr><td class="num">${D(t.date).toLocaleDateString("ru-RU",scope==="all"?{day:"2-digit",month:"2-digit",year:"2-digit"}:{day:"2-digit",month:"2-digit"})}</td><td><button type="button" class="linkish" data-act="finCatPick" data-v="${esc(t.cat)}" title="Показать только эту категорию">${esc(t.cat)}</button>${exTag(t)}${known?"":' <span class="chip late" title="Категории нет в списке">нет в списке</span>'}</td><td><span class="chip ${TYPE_CHIP[ty]}">${ty}</span></td><td style="color:var(--muted)">${esc(t.pay||"—")}</td><td style="color:var(--muted)">${esc(t.note)}</td><td>${tagChips("tx",t)}</td><td class="r num ${dcls}">${money(inc?+t.amount:-t.amount,true)}</td><td class="r"><button class="icon" data-act="delTx" data-id="${t.id}" aria-label="Удалить">✕</button></td></tr>`}).join("")}
-   </tbody></table></div>`:`<p class="empty">${filtered?"Ничего не найдено. Измените условия или нажмите «Сбросить».":"Операций пока нет. Запишите первую в форме выше."}</p>`}
+   ${list.length?`<div class="tbl-wrap"><table class="ops"><thead><tr><th>Дата</th><th>Категория</th><th>Тип</th><th>Способ</th><th>Комментарий</th><th>Теги</th><th class="r">Сумма</th><th></th></tr></thead><tbody>
+   ${list.map(t=>{if(t.cat===TRANSFER)return trRow(t,scope);const ty=catType(t.cat);const inc=ty==="Доход"||(ty==="Долг"&&txDir(t)==="in");const dcls=ty==="Долг"?"debtv":inc?"pos":"neg";const known=cats().some(c=>c.name===t.cat);return `<tr><td class="num c-date">${D(t.date).toLocaleDateString("ru-RU",scope==="all"?{day:"2-digit",month:"2-digit",year:"2-digit"}:{day:"2-digit",month:"2-digit"})}</td><td class="c-cat"><button type="button" class="linkish" data-act="finCatPick" data-v="${esc(t.cat)}" title="Показать только эту категорию">${esc(t.cat)}</button>${exTag(t)}${known?"":' <span class="chip late" title="Категории нет в списке">нет в списке</span>'}</td><td class="c-type"><span class="chip ${TYPE_CHIP[ty]}">${ty}</span></td><td class="c-pay" style="color:var(--muted)">${esc(t.pay||"—")}</td><td class="c-note" style="color:var(--muted)">${esc(t.note)}</td><td class="c-tags">${tagChips("tx",t)}</td><td class="r num c-sum ${dcls}">${money(inc?+t.amount:-t.amount,true)}</td><td class="r c-del"><button class="icon" data-act="delTx" data-id="${t.id}" aria-label="Удалить">✕</button></td></tr>`}).join("")}
+   </tbody></table></div>`:`<p class="empty">${filtered?"Ничего не найдено. Измените условия или нажмите «Сбросить».":"Операций пока нет. Запишите первую в форме выше."}</p>`}</div>
   </section>`}
+/* поиск обновляет только список — поле не перерисовывается, клавиатура на iPhone не закрывается */
+function opsRefresh(){const cur=document.getElementById("ops-body");if(!cur){render();return}
+  const tmp=document.createElement("div");tmp.innerHTML=opsSection(ui.finY+"-"+pad(ui.finM+1));
+  for(const id of["ops-count","ops-reset","ops-body"]){const a=document.getElementById(id),b=tmp.querySelector("#"+id);if(a&&b)a.innerHTML=b.innerHTML}}
 
 /* полоски по категориям: выбранные пользователем или все с тратами и планом */
 function picked(){return cats().some(c=>c.show)}
@@ -129,19 +134,19 @@ function walletStats(p){const r={};for(const w of WALLETS)r[w]={in:0,out:0,tin:0
   for(const t of S.finance.tx){if(!(t.date||"").startsWith(p))continue;const a=+t.amount||0;
     if(t.cat===TRANSFER){if(r[t.from])r[t.from].tout+=a;if(r[t.to])r[t.to].tin+=a;continue}
     const w=r[t.pay];if(!w)continue;if(catType(t.cat)==="Долг")continue;const f=txWalletFlow(t,t.pay);if(f>0)w.in+=f;else w.out+=-f}return r}
-function trRow(t,scope){return `<tr class="trf"><td class="num">${D(t.date).toLocaleDateString("ru-RU",scope==="all"?{day:"2-digit",month:"2-digit",year:"2-digit"}:{day:"2-digit",month:"2-digit"})}</td><td>Перевод${exTag(t)}</td><td><span class="chip">перевод</span></td><td style="color:var(--muted);white-space:nowrap">${esc(t.from)} → ${esc(t.to)}</td><td style="color:var(--muted)">${esc(t.note)}</td><td>${tagChips("tx",t)}</td><td class="r num" style="color:var(--muted)">${rub(+t.amount)}</td><td class="r"><button class="icon" data-act="delTx" data-id="${t.id}" aria-label="Удалить">✕</button></td></tr>`}
+function trRow(t,scope){return `<tr class="trf"><td class="num c-date">${D(t.date).toLocaleDateString("ru-RU",scope==="all"?{day:"2-digit",month:"2-digit",year:"2-digit"}:{day:"2-digit",month:"2-digit"})}</td><td class="c-cat">Перевод${exTag(t)}</td><td class="c-type"><span class="chip">перевод</span></td><td class="c-pay" style="color:var(--muted);white-space:nowrap">${esc(t.from)} → ${esc(t.to)}</td><td class="c-note" style="color:var(--muted)">${esc(t.note)}</td><td class="c-tags">${tagChips("tx",t)}</td><td class="r num c-sum" style="color:var(--muted)">${rub(+t.amount)}</td><td class="r c-del"><button class="icon" data-act="delTx" data-id="${t.id}" aria-label="Удалить">✕</button></td></tr>`}
 function walletsPanel(p,defDate){const hasDebt=debtStats().n>0;const ws=walletStats(p);const cfg=wcfg();const noPay=S.finance.tx.filter(t=>(t.date||"").startsWith(p)&&t.cat!==TRANSFER&&!WALLETS.includes(t.pay)).length;
   const bal={};for(const w of WALLETS)bal[w]=walletBalance(w);const neg=WALLETS.some(w=>bal[w]<0);
   return `<section class="panel"><div class="panel-h"><h2>Наличные и карта</h2><button class="btn sm" data-act="walletSet">${ui.walletSet?"Готово":"Начальные остатки"}</button></div>
    ${ui.walletSet?`<div class="wset">${WALLETS.map(w=>`<label>${w}: остаток<input type="number" step="0.01" id="ws-${w==="Карта"?"card":"cash"}-start" data-wset="${w}|start" value="${cfg[w].start||""}" placeholder="0"></label><label>на дату (считать операции с этого дня)<input type="date" id="ws-${w==="Карта"?"card":"cash"}-date" data-wset="${w}|date" value="${cfg[w].date||""}"></label>`).join("")}</div><span class="hint">Впишите, сколько было в кошельке на выбранную дату. Более ранние операции в остаток не попадут.</span>`:""}
    <div class="wallets">${WALLETS.map(w=>{const s=ws[w];const b=bal[w];return `<div class="wallet"><div class="panel-h"><b>${w}</b><span class="num wbal ${b<0?"neg":""}">${money(b)}</span></div>
     <div class="kv"><span>Пришло за месяц</span><b class="num pos">${s.in?"+"+rub(s.in):"0 ₽"}</b><span>Ушло за месяц</span><b class="num neg">${s.out?"−"+rub(s.out):"0 ₽"}</b>${hasDebt?(()=>{const dw=walletDebt(w);return `<span title="Взято в долг через этот кошелёк минус возвращённое">${dw<0?"Вам должны":"Долг"}</span><b class="num ${dw?"wdebtv":""}">${dw?rub(Math.abs(dw)):"—"}</b>`})():""}<span>Переводы</span><b class="num">${s.tin||s.tout?[s.tin?"+"+rub(s.tin):"",s.tout?"−"+rub(s.tout):""].filter(Boolean).join(" / "):"—"}</b></div></div>`}).join("")}</div>
-   <form class="row" data-form="transfer"><select id="tr-from" name="from" aria-label="Откуда"><option>Наличные</option><option>Карта</option></select><span class="hint">→</span><select id="tr-to" name="to" aria-label="Куда"><option>Карта</option><option>Наличные</option></select><input id="tr-amount" type="number" name="amount" min="0" step="0.01" placeholder="Сумма" required style="width:110px"><input id="tr-date" type="date" name="date" value="${defDate}" aria-label="Дата"><input id="tr-note" type="text" name="note" placeholder="Комментарий" class="grow" autocomplete="off"><button class="btn">Перевести</button></form>
+   <form class="row" data-form="transfer"><select id="tr-from" name="from" aria-label="Откуда"><option>Наличные</option><option>Карта</option></select><span class="hint">→</span><select id="tr-to" name="to" aria-label="Куда"><option>Карта</option><option>Наличные</option></select><input id="tr-amount" type="number" inputmode="decimal" name="amount" min="0" step="0.01" placeholder="Сумма" required style="width:110px"><input id="tr-date" type="date" name="date" value="${defDate}" aria-label="Дата"><input id="tr-note" type="text" name="note" placeholder="Комментарий" class="grow" autocomplete="off"><button class="btn">Перевести</button></form>
    <span class="hint">Перевод — одна операция: не доход и не расход, меняет только остатки.${hasDebt?" «Пришло» и «Ушло» — без долгов; долг показан отдельной строкой, но входит в остаток.":""}${neg?" Остаток ушёл в минус — задайте начальные остатки.":""}${noPay?` Операций без способа оплаты в этом месяце: ${noPay}, в остатки они не попадают.`:""}</span></section>`}
 
 function txForm(defDate,overview){return `<section class="panel ${overview?"txq":""}"><div class="panel-h"><h2>Новая операция</h2>${overview?'<a href="#" data-act="go" data-v="finance">Финансы →</a>':""}</div>
     <form data-form="addTx" style="display:flex;flex-direction:column;gap:10px">
-     <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="x-amount" type="number" name="amount" min="0" step="0.01" placeholder="Сумма, без минуса" required class="grow">
+     <div style="display:flex;gap:8px;flex-wrap:wrap"><input id="x-amount" type="number" inputmode="decimal" name="amount" min="0" step="0.01" placeholder="Сумма, без минуса" required class="grow">
      <input id="x-date" type="date" name="date" value="${defDate}" required aria-label="Дата"></div>
      <select id="x-cat" name="cat" required aria-label="Категория"><option value="" disabled ${ui.lastCat?"":"selected"}>Категория…</option>${catOptions(ui.lastCat)}</select>
      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
@@ -151,7 +156,8 @@ function txForm(defDate,overview){return `<section class="panel ${overview?"txq"
      ${overview?"":`<span class="hint">Тип подставится сам по категории. Платёж с категорией «Кредит: …» сразу попадёт в раздел «Кредиты». Категории типа «Долг» не считаются доходом или расходом.</span>`}
     </form></section>`}
 function overviewTx(){return txForm(TODAY(),true)}
-function yearMonths(){const st=(S.loans&&S.loans.start)||(new Date().getFullYear()+"-01");return Array.from({length:12},(_,i)=>C.addMonths(st,i))}
+const yearY=()=>ui.yearY||new Date().getFullYear();
+function yearMonths(){const y=yearY();return Array.from({length:12},(_,i)=>y+"-"+pad(i+1))}
 function vYear(){
   const ms=yearMonths();const src=S.finance.tx;
   const sums={};for(const t of src){const m=(t.date||"").slice(0,7);if(!ms.includes(m))continue;sums[t.cat]=sums[t.cat]||{};sums[t.cat][m]=(sums[t.cat][m]||0)+(+t.amount||0)}
@@ -164,7 +170,7 @@ function vYear(){
   const inc=tot("Доход"),obl=tot("Обязательный"),cr=tot("Кредит"),oth=tot("Другой");const dnet=ms.map(m=>src.filter(t=>(t.date||"").startsWith(m)&&catType(t.cat)==="Долг").reduce((a,t)=>a+(txDir(t)==="in"?1:-1)*(+t.amount||0),0));const left=ms.map((_,i)=>inc[i]-obl[i]-cr[i]-oth[i]);
   const foot=(label,arr,cls)=>`<tr class="foot"><td class="sticky">${label}</td><td></td><td></td>${arr.map(v=>`<td class="r num ${cls&&v<0?"neg":""}">${v?fmt(v):"·"}</td>`).join("")}<td class="r num"><b>${fmt(arr.reduce((a,b)=>a+b,0))}</b></td><td class="r num">${fmt(arr.reduce((a,b)=>a+b,0)/filledMonths)}</td></tr>`;
   return `<section class="panel"><div class="panel-h"><h2>Сводка по категориям и месяцам</h2><span class="hint">Красным — месяц, где расход по категории выше плана</span></div>
-   <div class="tbl-wrap"><table class="year"><thead><tr><th class="sticky">Категория</th><th>Тип</th><th class="r">План</th>${ms.map(m=>`<th class="r">${monShort(m)}</th>`).join("")}<th class="r">Итого</th><th class="r">Среднее</th></tr></thead>
+   <div class="tbl-wrap"><table class="year"><thead><tr><th class="sticky">Категория</th><th>Тип</th><th class="r">План</th>${ms.map(m=>`<th class="r">${monShort(m).split(" ")[0]}</th>`).join("")}<th class="r">Итого</th><th class="r">Среднее</th></tr></thead>
    <tbody>${names.map(row).join("")}</tbody><tfoot>${foot("Доходы",inc)}${foot("Обязательные",obl)}${foot("Платежи по кредитам",cr)}${foot("Другие расходы",oth)}${foot("Итог месяца",left,true)}</tfoot></table></div></section>`}
 const fmt=v=>new Intl.NumberFormat("ru-RU",{maximumFractionDigits:0}).format(Math.round(v));
 
@@ -173,12 +179,12 @@ function vCats(){
   const planOth=cats().filter(c=>c.type==="Другой").reduce((a,c)=>a+(+c.plan||0),0);
   const budget=S.loans&&S.loans.list&&S.loans.list.length?+S.loans.budget||0:0;
   return `<div class="stats s4"><div class="stat"><small>Обязательные, план</small><span class="num">${rub(planObl)}</span></div><div class="stat"><small>Другие, план</small><span class="num">${rub(planOth)}</span></div><div class="stat"><small>Кредиты, бюджет</small><span class="num">${rub(budget)}</span></div><div class="stat"><small>Нужно дохода в месяц</small><span class="num">${rub(planObl+planOth+budget)}</span></div></div>
-  <section class="panel"><div class="panel-h"><h2>Категории доходов и расходов</h2><span class="hint">Отмеченные «Показ» видны в «Финансах» и на «Обзоре». Двойной щелчок по названию — переименовать.</span></div>
+  <section class="panel"><div class="panel-h"><h2>Категории доходов и расходов</h2><span class="hint">Отмеченные «Показ» видны в «Финансах» и на «Обзоре». ${RENAME_HINT}.</span></div>
    <form class="row" data-form="addCat"><input id="c-name" type="text" class="grow" name="name" placeholder="Новая категория" required autocomplete="off">
     <select id="c-type" name="type" aria-label="Тип">${TYPES.map(t=>`<option>${t}</option>`).join("")}</select>
-    <input id="c-plan" type="number" name="plan" min="0" step="any" placeholder="План в месяц" style="width:140px"><button class="btn pri">Добавить</button></form>
+    <input id="c-plan" type="number" inputmode="decimal" name="plan" min="0" step="any" placeholder="План в месяц" style="width:140px"><button class="btn pri">Добавить</button></form>
    <div class="tbl-wrap"><table><thead><tr><th title="Показывать на «Обзоре» и в «Финансах»">Показ</th><th>Категория</th><th>Тип</th><th class="r">План в месяц, ₽</th><th>Комментарий</th><th></th></tr></thead><tbody>
-   ${sortedCats().map(({c,i},n,arr)=>`${n===0||arr[n-1].c.type!==c.type?grpRow(c.type,arr):""}<tr><td><input type="checkbox" class="check" data-catfield="show" data-i="${i}" ${c.show?"checked":""} aria-label="Показывать «${esc(c.name)}»"></td><td><span class="t" data-catrename="${i}" title="Двойной щелчок — переименовать">${esc(c.name)}</span></td>
+   ${sortedCats().map(({c,i},n,arr)=>`${n===0||arr[n-1].c.type!==c.type?grpRow(c.type,arr):""}<tr><td><input type="checkbox" class="check" data-catfield="show" data-i="${i}" ${c.show?"checked":""} aria-label="Показывать «${esc(c.name)}»"></td><td><span class="t" data-catrename="${i}" title="${RENAME_HINT}">${esc(c.name)}</span></td>
      <td><select data-catfield="type" data-i="${i}" aria-label="Тип">${TYPES.map(t=>`<option ${t===c.type?"selected":""}>${t}</option>`).join("")}</select></td>
      <td class="r">${c.type==="Долг"?`<select data-catfield="dir" data-i="${i}" aria-label="Направление"><option value="in" ${c.dir==="in"?"selected":""}>+ деньги пришли</option><option value="out" ${c.dir!=="in"?"selected":""}>− деньги ушли</option></select>`:`<input type="number" min="0" step="any" data-catfield="plan" data-i="${i}" value="${c.plan||""}" placeholder="—" style="width:110px;text-align:right" aria-label="План">`}</td>
      <td><input type="text" data-catfield="note" data-i="${i}" value="${esc(c.note||"")}" placeholder="—" style="width:100%" aria-label="Комментарий"></td>
@@ -220,6 +226,7 @@ function planSum(r,base){const s=r.summary;const L=S.loans;
 const monPrep=k=>{const [y,m]=k.split("-").map(Number);return MONTHS[m-1].toLowerCase().replace(/ь$/,"е").replace(/й$/,"е").replace(/т$/,"те")+" "+y};
 function liveUpdate(){const r=calc();const live=document.getElementById("loan-live");if(live)live.innerHTML=liveBody(r);const ps=document.getElementById("plan-sum");if(ps)ps.innerHTML=planSum(r,ui.loanBase)}
 function onInput(t){
+  if(t.id==="fin-q"){ui.finQ=t.value;opsRefresh();return true}
   if(t.id==="ln-budget-range"||t.id==="ln-budget"){if(!S.loans)return true;if(!ui.loanBase){const r0=calc();ui.loanBase={close:r0.summary.closeMonth,overpay:r0.summary.overpay}}
     const v=Math.max(0,+t.value||0);S.loans.budget=v;const o=document.getElementById(t.id==="ln-budget"?"ln-budget-range":"ln-budget");if(o)o.value=v;
     const cm=C.closeMonthFor(S.loans,v);if(cm){S.loans.target=cm;const ti=document.getElementById("ln-target");if(ti)ti.value=cm}
@@ -294,13 +301,13 @@ function loansEditor(){const loans=S.loans.list;
    <td class="r"><input type="number" step="0.01" data-lfield="balance" data-i="${j}" value="${l.balance}" style="width:120px;text-align:right"></td>
    <td class="r"><input type="number" step="0.1" data-lfield="ratePct" data-i="${j}" value="${Math.round(l.rate*1000)/10}" style="width:70px;text-align:right"></td>
    <td class="r"><input type="number" step="1" data-lfield="min" data-i="${j}" value="${l.min}" style="width:100px;text-align:right"></td>
-   <td><select data-lfield="cat" data-i="${j}">${cats().filter(c=>c.type==="Кредит").map(c=>`<option ${c.name===l.cat?"selected":""}>${esc(c.name)}</option>`).join("")}</select></td>
+   <td><select data-lfield="cat" data-i="${j}">${cats().some(c=>c.type==="Кредит"&&c.name===l.cat)?"":`<option selected>${esc(l.cat||"")}</option>`}${cats().filter(c=>c.type==="Кредит").map(c=>`<option ${c.name===l.cat?"selected":""}>${esc(c.name)}</option>`).join("")}</select></td>
    <td><button class="icon" data-act="delLoan" data-i="${j}" aria-label="Удалить кредит">✕</button></td></tr>`).join("")}</tbody></table></div>`}
 function loanForm(){return `<form class="row" data-form="addLoan" style="border-top:1px dashed var(--line);padding-top:12px">
    <input id="ln-name" type="text" name="name" placeholder="Новый кредит, например «Сбер, карта»" required class="grow" autocomplete="off">
-   <input id="ln-bal" type="number" name="balance" step="0.01" min="0" placeholder="Долг" required style="width:120px">
-   <input id="ln-rate" type="number" name="rate" step="0.1" min="0" placeholder="Ставка, %" required style="width:100px">
-   <input id="ln-min" type="number" name="min" step="1" min="0" placeholder="Обяз. платёж" required style="width:120px">
+   <input id="ln-bal" type="number" inputmode="decimal" name="balance" step="0.01" min="0" placeholder="Долг" required style="width:120px">
+   <input id="ln-rate" type="number" inputmode="decimal" name="rate" step="0.1" min="0" placeholder="Ставка, %" required style="width:100px">
+   <input id="ln-min" type="number" inputmode="decimal" name="min" step="1" min="0" placeholder="Обяз. платёж" required style="width:120px">
    <button class="btn">Добавить кредит</button></form><span class="hint">Для нового кредита автоматически появится категория «Кредит: …» — выбирайте её при записи платежа.</span>`}
 
 function chart(r){
@@ -341,6 +348,9 @@ function overviewMoney(){
 function onClick(act,a){
   switch(act){
     case "finTab":ui.finTab=a.dataset.t;render();return true;
+    case "yearPrev":ui.yearY=yearY()-1;render();return true;
+    case "yearNext":ui.yearY=yearY()+1;render();return true;
+    case "yearNow":ui.yearY=new Date().getFullYear();render();return true;
     case "loanTab":ui.loanTab=a.dataset.t;render();return true;
     case "finScope":ui.finScope=a.dataset.v;render();return true;
     case "walletSet":ui.walletSet=!ui.walletSet;render();return true;
@@ -348,7 +358,11 @@ function onClick(act,a){
     case "finReset":ui.finQ="";ui.finCat="";ui.finType="";ui.tag.tx="";render();return true;
     case "finCatPick":ui.finCat=ui.finCat===a.dataset.v?"":a.dataset.v;render();return true;
     case "payWay":ui.payWay=a.dataset.v;a.parentNode.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",b===a));return true;
-    case "delCat":{const i=+a.dataset.i;const c=cats()[i];if(!c)return true;snapshotFor("finance");S.finance.cats.splice(i,1);save("finance");render();toast(`Категория «${c.name}» удалена`,true);return true}
+    case "delCat":{const i=+a.dataset.i;const c=cats()[i];if(!c)return true;
+      const n=S.finance.tx.filter(t=>t.cat===c.name).length;const ln=((S.loans&&S.loans.list)||[]).find(l=>l.cat===c.name);
+      if(ln){toast(`Категория привязана к кредиту «${ln.short||ln.name}» — удалить её нельзя`);return true}
+      if(n){toast(`В категории «${c.name}» ${n} ${plural(n,"операция","операции","операций")} — удалить можно только пустую. Её можно переименовать или сменить тип`);return true}
+      snapshotFor("finance");S.finance.cats.splice(i,1);save("finance");render();toast(`Категория «${c.name}» удалена`,true);return true}
     case "loanUp":case "loanDown":{const i=+a.dataset.i,j=act==="loanUp"?i-1:i+1;const L=S.loans.list;if(j<0||j>=L.length)return true;[L[i],L[j]]=[L[j],L[i]];save("loans");render();return true}
     case "delLoan":{const i=+a.dataset.i;snapshotFor("loans");const l=S.loans.list.splice(i,1)[0];save("loans");render();toast(`Кредит «${l.short||l.name}» удалён`,true);return true}
   }

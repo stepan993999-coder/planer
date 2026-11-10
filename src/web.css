@@ -52,4 +52,26 @@ body{background:var(--bg)}
   .toast{left:50%;bottom:calc(80px + env(safe-area-inset-bottom,0px));max-width:calc(100% - 32px)}
   .head .seg{width:100%;overflow-x:auto;flex-wrap:nowrap}
   .seg button{white-space:nowrap}
+  /* 2.4: удобнее на телефоне */
+  .panel-h{flex-wrap:wrap}
+  .panel-h>.seg{max-width:100%;overflow-x:auto;flex-wrap:nowrap;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+  .panel-h>.seg::-webkit-scrollbar,.head .seg::-webkit-scrollbar{display:none}
+  .seg{gap:16px} .seg button{padding:10px 0}
+  .day{overflow:hidden}
+  .day .dsum{font-size:9px;padding:0;white-space:nowrap;letter-spacing:-.02em;line-height:1.1}
+  .ds-f{display:none} .ds-s{display:inline}
+  .filters>input,.filters>select{flex:1 1 140px;min-width:0}
+  .time-edit input,.time-edit select{padding:8px 8px}
+  .inline-edit{padding:8px 8px!important}
+  .goal-ctl .btn.sm,.tagnote .btn.sm{padding:9px 14px}
+  .wset{grid-template-columns:minmax(0,1fr)}
+  form.row>input.grow{flex-basis:100%}
+  /* операции — карточками, без прокрутки вбок */
+  table.ops,table.ops tbody{display:block}
+  table.ops thead{display:none}
+  table.ops tr{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto;grid-template-areas:"cat cat cat sum del" "date type pay pay pay" "note note note note note" "tags tags tags tags tags";gap:4px 8px;align-items:center;padding:11px 0;border-bottom:1px dashed var(--line)}
+  table.ops td{display:block;padding:0;border:0;min-width:0;background:none!important}
+  table.ops .c-cat{grid-area:cat;font-weight:600;overflow-wrap:anywhere} table.ops .c-sum{grid-area:sum;white-space:nowrap;font-weight:600} table.ops .c-del{grid-area:del}
+  table.ops .c-date{grid-area:date;color:var(--muted);font-size:12px} table.ops .c-type{grid-area:type} table.ops .c-pay{grid-area:pay;font-size:12px}
+  table.ops .c-note{grid-area:note;overflow-wrap:anywhere} table.ops .c-note:empty{display:none} table.ops .c-tags{grid-area:tags}
 }
