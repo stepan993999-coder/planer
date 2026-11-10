@@ -167,9 +167,23 @@ function showAccount(){
    <div class="sync-actions"><button class="btn pri" data-a="now">Синхронизировать сейчас</button><button class="btn" data-a="out">Выйти</button><button class="btn" data-a="x">Закрыть</button></div>`);
   o.onclick=async e=>{const b=e.target.closest("[data-a]");if(!b)return;const a=b.dataset.a;closeOverlay();
     if(a==="now"){pushDirty();pull(false)}
-    if(a==="out"){try{await sb.auth.signOut()}catch(err){}user=null;if(channel){sb.removeChannel(channel);channel=null}lsSet(LS_MODE,"local");status("local","Вы вышли — данные только на этом устройстве")}}
+    if(a==="out")signOut()}
 }
-async function onUser(u){if(!u)return;const firstForUser=!user||user.id!==u.id;user=u;waitingNet=false;
+const acctListeners=[];const acctChanged=()=>{for(const cb of acctListeners)try{cb()}catch(e){console.error(e)}};
+async function signOut(){try{await sb.auth.signOut()}catch(err){}user=null;waitingNet=false;if(channel){sb.removeChannel(channel);channel=null}lsSet(LS_MODE,"local");status("local","Вы вышли — данные только на этом устройстве");acctChanged()}
+/* смена пароля: сначала проверяем текущий (повторный вход), затем задаём новый */
+async function changePassword(cur,next){
+  if(!sb||!user)return{ok:false,msg:"Сначала войдите в аккаунт"};
+  if(!next||next.length<6)return{ok:false,msg:"Новый пароль — не меньше 6 символов"};
+  if(cur===next)return{ok:false,msg:"Новый пароль совпадает с текущим"};
+  const net=m=>/fetch|network|failed/i.test(m||"");
+  let r;try{r=await sb.auth.signInWithPassword({email:user.email,password:cur})}catch(e){return{ok:false,msg:"Нет связи с сервером. Проверьте интернет"}}
+  if(r.error)return{ok:false,msg:/invalid login/i.test(r.error.message)?"Текущий пароль указан неверно":net(r.error.message)?"Нет связи с сервером. Проверьте интернет":"Ошибка: "+r.error.message};
+  try{r=await sb.auth.updateUser({password:next})}catch(e){return{ok:false,msg:"Нет связи с сервером. Проверьте интернет"}}
+  if(r.error){const m=r.error.message||"";return{ok:false,msg:/different from the old/i.test(m)?"Новый пароль совпадает с текущим":/weak|at least|characters/i.test(m)?"Пароль слишком простой: "+m:/reauth/i.test(m)?"Сервер требует подтверждение по почте — смените пароль через письмо Supabase":net(m)?"Нет связи с сервером. Проверьте интернет":"Ошибка: "+m}}
+  return{ok:true}}
+function account(){return{configured,signedIn:!!user,email:user?user.email||"":"",waitingNet}}
+async function onUser(u){if(!u)return;const firstForUser=!user||user.id!==u.id;user=u;waitingNet=false;if(firstForUser)acctChanged();
   if(baseBox.uid!==u.id){base={};baseBox={uid:u.id,v:base};saveBase()}       // другой аккаунт — база не годится
   if(firstForUser)await pull(true)}
 
@@ -183,7 +197,7 @@ async function resume(){
   resuming=false;
   let stored=false;try{stored=!!localStorage.getItem("planer-auth")}catch(e){}
   if(s&&s.session){await onUser(s.session.user);return}
-  if(stored&&(failed||navigator.onLine===false)){waitingNet=true;status("err","Нет интернета — изменения сохраняются на устройстве и отправятся позже");return}
+  if(stored&&(failed||navigator.onLine===false)){waitingNet=true;status("err","Нет интернета — изменения сохраняются на устройстве и отправятся позже");acctChanged();return}
   waitingNet=false;
   if(lsGet(LS_MODE,"")!=="local")showLogin();else status("local","Без синхронизации — нажмите, чтобы войти")}
 
@@ -204,6 +218,7 @@ function save(k,v){data[k]=clone(v);localSave(k,data[k]);if(configured){markDirt
 
 const api=Object.assign({},LOCAL||{badge(){},notify(){},openDataFolder(){},onNav(){},onNewTask(){}},{
   platform:PLATFORM,load,save,onRemote:cb=>{listeners.push(cb)},syncMenu:showAccount,_merge3:merge3,
+  account,changePassword,signOut,signIn:()=>{if(!configured)return;if(waitingNet)resume();else showLogin()},onAccount:cb=>{acctListeners.push(cb)},syncNow:()=>{pushDirty();pull(false)},
   /* после загрузки из файла: данные этого устройства целиком заменяют облако */
   forceLocal(){if(!configured)return;for(const k of KEYS)if(data[k]!=null){markDirty(k,true);setForce(k,true)}if(sb&&user)for(const k of KEYS)if(dirty[k])schedulePush(k)}});
 window.plannerSync=api;   // на Mac window.planner защищён от подмены, поэтому отдельное имя

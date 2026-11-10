@@ -3,7 +3,7 @@
 "use strict";
 const $=s=>document.querySelector(s);
 const P=()=>window.Planer;
-const MORE=["loans","goals"];
+const MORE=["loans","goals","profile"];
 let importData=null,importName="";
 
 function syncTabs(v){const sh=$("#sheet");const open=sh&&!sh.hidden;

@@ -10,5 +10,8 @@ contextBridge.exposeInMainWorld("planner", {
   onNav: cb => ipcRenderer.on("planner:nav", (_e, v) => cb(v)),
   onNewTask: cb => ipcRenderer.on("planner:newTask", () => cb()),
   onUndo: cb => ipcRenderer.on("planner:undo", () => cb()),
-  onRedo: cb => ipcRenderer.on("planner:redo", () => cb())
+  onRedo: cb => ipcRenderer.on("planner:redo", () => cb()),
+  getTheme: () => ipcRenderer.invoke("planner:getTheme"),
+  setTheme: t => ipcRenderer.send("planner:setTheme", t),
+  onTheme: cb => ipcRenderer.on("planner:theme", (_e, t) => cb(t))
 });

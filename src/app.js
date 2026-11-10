@@ -41,7 +41,7 @@ function save(k){histRecord(k);API.save(k,clone(S[k]))}
 /* ---------- состояние интерфейса ---------- */
 const now=new Date();
 const ui={view:"overview",calY:now.getFullYear(),calM:now.getMonth(),calSel:TODAY(),finY:now.getFullYear(),finM:now.getMonth(),taskFilter:"open",txType:"out",tag:{}};
-const VIEWS=[["overview","Обзор"],["calendar","Календарь"],["tasks","Задачи"],["finance","Финансы"],["loans","Кредиты"],["goals","Цели"]];
+const VIEWS=[["overview","Обзор"],["calendar","Календарь"],["tasks","Задачи"],["finance","Финансы"],["loans","Кредиты"],["goals","Цели"],["profile","Профиль"]];
 function go(v){if(VIEWS.some(x=>x[0]===v)){ui.view=v;if(window.PlanerHooks&&PlanerHooks.beforeGo)PlanerHooks.beforeGo(v);render();$("#main").scrollTop=0;if(API.platform==="web")window.scrollTo(0,0)}}
 
 /* ---------- отмена ---------- */
@@ -68,7 +68,7 @@ function render(){
   API.badge(due);
   $("#nav").innerHTML=VIEWS.map(([id,name],i)=>`<a href="#" data-act="go" data-v="${id}" ${v===id?'aria-current="page"':""}><span>${name}</span>${id==="tasks"&&due?`<span class="cnt">${due}</span>`:(API.platform==="web"?"":`<kbd>⌘${i+1}</kbd>`)}</a>`).join("");
   if(window.PlanerHooks&&PlanerHooks.afterNav)PlanerHooks.afterNav(v);
-  const fn={overview:vOverview,calendar:vCalendar,tasks:vTasks,finance:()=>M.vFinance(),loans:()=>M.vLoans(),goals:vGoals,habits:vHabits,notes:vNotes}[v];
+  const fn={overview:vOverview,calendar:vCalendar,tasks:vTasks,finance:()=>M.vFinance(),loans:()=>M.vLoans(),goals:vGoals,profile:vProfile,habits:vHabits,notes:vNotes}[v];
   $("#main").innerHTML=`<div class="wrap">${window.PlanerHooks&&PlanerHooks.banner?PlanerHooks.banner():""}${fn()}</div>`;
   if(fid){const el=document.getElementById(fid);if(el){el.focus();if(selr)try{el.setSelectionRange(selr[0],selr[1])}catch(e){}}}
 }
@@ -249,6 +249,43 @@ function vGoals(){
     <div class="goal-ctl"><button class="btn sm" data-act="gDec" data-id="${g.id}" aria-label="Минус один">−1</button><button class="btn sm" data-act="gInc" data-id="${g.id}" aria-label="Плюс один">+1</button>
      <input type="number" step="any" id="gs-${g.id}" data-goal="${g.id}" value="${g.current}" aria-label="Текущее значение"><span class="hint">текущее, Enter</span></div></article>`}).join(""):`<p class="empty">${S.goals.length?"Нет целей с этим тегом.":"Целей пока нет. Добавьте первую: название, откуда стартуете, к какому числу идёте и срок."}</p>`}</div>`}
 
+/* ---------- профиль: аккаунт и тема ---------- */
+const THEMES=[["system","Как в системе"],["light","Светлая"],["dark","Тёмная"]];
+function getTheme(){try{const t=localStorage.getItem("planer-theme");return THEMES.some(x=>x[0]===t)?t:"system"}catch(e){return"system"}}
+const THEME_BG={light:"#F3F2EF",dark:"#0B0B0C"};
+function applyTheme(t){const r=document.documentElement;if(t==="light"||t==="dark")r.dataset.theme=t;else delete r.dataset.theme;
+  document.querySelectorAll('meta[name="theme-color"]').forEach(m=>{if(!m.dataset.media)m.dataset.media=m.getAttribute("media")||"";
+    if(t==="system"){if(m.dataset.media)m.setAttribute("media",m.dataset.media)}else{m.removeAttribute("media");m.setAttribute("content",THEME_BG[t])}})}
+function setTheme(t){try{localStorage.setItem("planer-theme",t)}catch(e){}
+  if(API.setTheme)API.setTheme(t);else applyTheme(t);   // на Mac тему меняет сама программа — вместе с меню «Вид → Тема»
+  render()}
+function vProfile(){
+  const A=API.account?API.account():{configured:false};const th=getTheme();
+  let acc;
+  if(!A.configured)acc=`<p class="empty">Синхронизация не настроена — данные хранятся только на этом устройстве.</p>`;
+  else if(!A.signedIn)acc=`<div class="kv"><span>Логин</span><b>${A.waitingNet?"вход восстановится, когда появится интернет":"вход не выполнен"}</b><span>Синхронизация</span><span><button type="button" class="sync" data-sync data-act="syncMenu"><b></b><span></span></button></span></div>
+    ${A.waitingNet?"":`<p class="hint" style="margin:0">Без входа данные хранятся только на этом устройстве. Войдите, чтобы они были общими на iPhone и Mac.</p><div class="prof-actions"><button class="btn pri" data-act="pfLogin">Войти</button></div>`}`;
+  else acc=`<div class="kv"><span>Логин</span><b>${esc(A.email)}</b>
+     <span>Пароль</span><span style="display:flex;gap:12px;align-items:center;flex-wrap:wrap"><b class="pw-dots" aria-label="Пароль скрыт">••••••••</b>${ui.pwOpen?"":'<button type="button" class="btn sm" data-act="pwOpen">Сменить пароль</button>'}</span>
+     <span>Синхронизация</span><span><button type="button" class="sync" data-sync data-act="syncMenu"><b></b><span></span></button></span></div>
+    ${ui.pwOpen?`<form class="pw-form" data-form="pwChange" autocomplete="on">
+      <input type="email" name="email" value="${esc(A.email)}" autocomplete="username" hidden>
+      <label class="mini">Текущий пароль<input id="pw-cur" type="password" name="cur" autocomplete="current-password" required></label>
+      <label class="mini">Новый пароль<input id="pw-new" type="password" name="next" autocomplete="new-password" minlength="6" required placeholder="не меньше 6 символов"></label>
+      <label class="mini">Новый пароль ещё раз<input id="pw-new2" type="password" name="next2" autocomplete="new-password" minlength="6" required></label>
+      <p class="pw-msg" id="pw-msg" role="status"></p>
+      <div class="prof-actions"><button class="btn pri" id="pw-save">Сохранить пароль</button><button type="button" class="btn" data-act="pwCancel">Отмена</button></div></form>`:""}
+    <span class="hint">Пароль хранится на сервере в зашифрованном виде, поэтому показать его нельзя — можно только задать новый. После смены на других устройствах вход сохранится.</span>
+    <div class="prof-actions"><button class="btn" data-act="pfSync">Синхронизировать сейчас</button><button class="btn" data-act="pfOut">Выйти из аккаунта</button></div>`;
+  return `<div class="head"><div><div class="eyebrow">Аккаунт и оформление</div><h1>Профиль</h1></div></div>
+  <div class="prof">
+   <section class="panel"><h2>Аккаунт</h2>${acc}</section>
+   <section class="panel"><h2>Тема оформления</h2>
+    <div class="themes" role="radiogroup" aria-label="Тема">${THEMES.map(([id,n])=>`<button type="button" class="theme-opt th-${id}" data-act="theme" data-v="${id}" role="radio" aria-checked="${th===id}" aria-pressed="${th===id}"><i></i>${n}</button>`).join("")}</div>
+    <span class="hint">${th==="system"?"Тема переключается вместе с системой: днём светлая, ночью тёмная, если так настроено на устройстве.":"Тема выбрана вручную и не зависит от настроек системы."} Выбор сохраняется на этом устройстве${API.platform==="mac"?" и совпадает с меню «Вид → Тема»":""}.</span>
+   </section>
+  </div>`}
+
 function vHabits(){
   const days=[];for(let i=13;i>=0;i--)days.push(addDays(new Date(),-i));const td=TODAY();const list=S.habits.filter(h=>byTag("habits",h));
   return `<div class="head"><div><div class="eyebrow">Последние 2 недели</div><h1>Привычки</h1></div></div>
@@ -337,6 +374,13 @@ document.addEventListener("click",e=>{
     case "noteDone":ui.noteEdit=null;if(notesT){clearTimeout(notesT);notesT=null;save("notes")}render();break;
     case "noteNew":{const n={id:uid(),text:"",tags:ui.tag.notes?[ui.tag.notes]:[],updated:Date.now()};S.notes.items.push(n);ui.noteSel=n.id;ui.noteEdit=n.id;save("notes");render();const t=document.getElementById("notes");if(t)t.focus();break}
     case "seed":seed();break;
+    case "theme":setTheme(a.dataset.v);break;
+    case "pwOpen":ui.pwOpen=true;render();{const el=document.getElementById("pw-cur");if(el)el.focus()}break;
+    case "pwCancel":ui.pwOpen=false;render();break;
+    case "pfLogin":if(API.signIn)API.signIn();break;
+    case "pfSync":if(API.syncNow){API.syncNow();toast("Сверяюсь с облаком…")}break;
+    case "pfOut":if(a.dataset.sure!=="1"){a.dataset.sure="1";a.textContent="Точно выйти?";toast("После выхода данные останутся на этом устройстве, но перестанут синхронизироваться. Нажмите ещё раз");break}
+      if(API.signOut)API.signOut();ui.pwOpen=false;break;
     case "clearEx":{S.tasks=S.tasks.filter(x=>!x.ex);S.events=S.events.filter(x=>!x.ex);S.finance.tx=S.finance.tx.filter(x=>!x.ex);S.goals=S.goals.filter(x=>!x.ex);S.habits=S.habits.filter(x=>!x.ex);
       if(S.finance.exBudgets){for(const c of S.finance.exBudgets)delete S.finance.budgets[c];delete S.finance.exBudgets}
       S.finance.cats=(S.finance.cats||[]).filter(c=>!c.ex||S.finance.tx.some(t=>t.cat===c.name));for(const c of S.finance.cats)delete c.ex;
@@ -375,6 +419,7 @@ document.addEventListener("contextmenu",e=>{const a=e.target.closest('.hc[data-a
 document.addEventListener("submit",e=>{
   const f=e.target.closest("form[data-form]");if(!f)return;e.preventDefault();
   const v=Object.fromEntries(new FormData(f).entries());const kind=f.dataset.form;let focusId=null;
+  if(kind==="pwChange"){pwChange(f,v);return}
   const trim=s=>String(s||"").trim();
   if(kind==="addTask"||kind==="quickTask"||kind==="addDayTask"){
     const title=trim(v.title);if(!title)return;
@@ -387,6 +432,14 @@ document.addEventListener("submit",e=>{
   if(kind==="addHabit"){const name=trim(v.name);if(!name)return;S.habits.push({id:uid(),name,days:{},target:Math.max(1,Math.round(+v.target||1)),mode:v.mode==="max"?"max":"min",created:TODAY(),tags:parseTags(v.tags)});save("habits");focusId="h-name"}
   render();if(focusId){const el=document.getElementById(focusId);if(el)el.focus()}
 });
+async function pwChange(f,v){const msg=f.querySelector("#pw-msg"),btn=f.querySelector("#pw-save");const say=(t,ok)=>{msg.textContent=t;msg.classList.toggle("ok",!!ok)};
+  if(v.next!==v.next2){say("Новые пароли не совпадают");f.querySelector("#pw-new2").focus();return}
+  if(String(v.next).length<6){say("Новый пароль — не меньше 6 символов");return}
+  btn.disabled=true;say("Проверяю…",true);msg.classList.remove("ok");
+  const r=API.changePassword?await API.changePassword(v.cur,v.next):{ok:false,msg:"Смена пароля недоступна"};
+  if(!document.body.contains(f))return;btn.disabled=false;
+  if(!r.ok){say(r.msg);return}
+  ui.pwOpen=false;render();toast("Пароль изменён. Используйте новый пароль при следующем входе")}
 API.onNav(v=>go(v));
 API.onNewTask(()=>{if(ui.view!=="tasks"&&ui.view!=="overview")go("tasks");const el=document.getElementById(ui.view==="tasks"?"t-title":"qt");if(el)el.focus()});
 
@@ -420,6 +473,11 @@ function seed(){
   for(const k of["tasks","events","finance","goals"])save(k);render();
 }
 
+/* ---------- тема и аккаунт ---------- */
+if(API.getTheme)Promise.resolve(API.getTheme()).then(t=>{if(t){try{localStorage.setItem("planer-theme",t)}catch(e){}if(ui.view==="profile")render()}}).catch(()=>{});
+else applyTheme(getTheme());
+if(API.onTheme)API.onTheme(t=>{try{localStorage.setItem("planer-theme",t)}catch(e){}if(ui.view==="profile"&&!typing())render()});
+if(API.onAccount)API.onAccount(()=>{ui.pwOpen=false;if(ui.view==="profile")render()});
 /* ---------- старт ---------- */
 API.load().then(data=>{
   data=data||{};

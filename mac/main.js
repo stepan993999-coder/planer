@@ -67,6 +67,8 @@ ipcMain.on("planner:notify", (_e, title, body) => {
   if (Notification.isSupported()) new Notification({ title, body, silent: false }).show();
 });
 ipcMain.on("planner:openDataFolder", () => shell.openPath(DATA_DIR()));
+ipcMain.handle("planner:getTheme", () => settings.theme || "system");
+ipcMain.on("planner:setTheme", (_e, t) => { if (["system", "light", "dark"].includes(t)) setTheme(t); });
 
 /* ---------- экспорт / импорт ---------- */
 async function exportData() {
@@ -122,13 +124,14 @@ function setTheme(t) {
   nativeTheme.themeSource = t;
   saveSettings();
   buildMenu();
+  if (win) win.webContents.send("planner:theme", t);
 }
 function go(view) { if (win) { win.show(); win.webContents.send("planner:nav", view); } }
 
 function buildMenu() {
   const sections = [
     ["overview", "Обзор"], ["calendar", "Календарь"], ["tasks", "Задачи"], ["finance", "Финансы"], ["loans", "Кредиты"],
-    ["goals", "Цели"]
+    ["goals", "Цели"], ["profile", "Профиль"]
   ];
   const template = [
     {
@@ -259,7 +262,7 @@ if (!app.requestSingleInstanceLock()) {
     app.setAboutPanelOptions({
       applicationName: "Планер",
       applicationVersion: app.getVersion(),
-      copyright: "Календарь, задачи, финансы, цели и привычки"
+      copyright: "Календарь, задачи, финансы, кредиты и цели"
     });
     buildMenu();
     createWindow();
