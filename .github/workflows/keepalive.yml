@@ -1,0 +1,36 @@
+# Бесплатный проект Supabase приостанавливается, если к базе неделю никто не обращается.
+# Раз в день этот сценарий делает лёгкий запрос к базе планера (без входа — данные он не видит),
+# чтобы проект оставался активным, даже когда приложение долго не открывали.
+name: Supabase keep-alive
+
+on:
+  schedule:
+    - cron: "37 4 * * *"   # каждый день в 07:37 по Москве
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write   # чтобы GitHub не отключил ежедневный запуск через 60 дней без коммитов
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Запрос к базе
+        run: |
+          URL=$(sed -n 's/.*supabaseUrl:"\([^"]*\)".*/\1/p' config.js)
+          KEY=$(sed -n 's/.*supabaseKey:"\([^"]*\)".*/\1/p' config.js)
+          test -n "$URL" && test -n "$KEY"
+          for i in 1 2 3; do
+            code=$(curl -s -o /dev/null -w "%{http_code}" "$URL/rest/v1/planner_docs?select=key&limit=1" -H "apikey: $KEY")
+            echo "Ответ базы: $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 20
+          done
+          echo "::error::База не ответила — проверьте, не приостановлен ли проект в панели Supabase"
+          exit 1
+      - name: Не дать GitHub отключить расписание
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/keepalive.yml/enable" || true
