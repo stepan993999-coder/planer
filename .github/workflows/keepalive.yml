@@ -16,9 +16,9 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
       - name: Запрос к базе
         run: |
+          curl -sf "https://raw.githubusercontent.com/${{ github.repository }}/${{ github.sha }}/config.js" -o config.js
           URL=$(sed -n 's/.*supabaseUrl:"\([^"]*\)".*/\1/p' config.js)
           KEY=$(sed -n 's/.*supabaseKey:"\([^"]*\)".*/\1/p' config.js)
           test -n "$URL" && test -n "$KEY"
