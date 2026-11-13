@@ -398,3 +398,11 @@ button,a,input,select,label,summary{touch-action:manipulation}
 .prof .kv>*{text-align:left;justify-self:start}
 .pw-form label.mini{flex-direction:column;align-items:stretch;gap:6px}
 .pw-form label.mini input{width:100%}
+/* редактирование операции */
+.icon.ed{opacity:.55;margin-right:2px}
+.icon.ed:hover{opacity:1;color:var(--accent)}
+tr.tx-editing td{background:var(--accent-soft)!important}
+tr.tx-flash td{animation:txflash 1.2s ease-out}
+@keyframes txflash{from{background:var(--accent-soft)}to{background:transparent}}
+.tx-edit{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent);scroll-margin-top:16px}
+td.c-del{white-space:nowrap}

@@ -42,7 +42,7 @@ function save(k){histRecord(k);API.save(k,clone(S[k]))}
 const now=new Date();
 const ui={view:"overview",calY:now.getFullYear(),calM:now.getMonth(),calSel:TODAY(),finY:now.getFullYear(),finM:now.getMonth(),taskFilter:"open",txType:"out",tag:{}};
 const VIEWS=[["overview","Обзор"],["calendar","Календарь"],["tasks","Задачи"],["finance","Финансы"],["loans","Кредиты"],["goals","Цели"],["profile","Профиль"]];
-function go(v){if(VIEWS.some(x=>x[0]===v)){ui.view=v;if(window.PlanerHooks&&PlanerHooks.beforeGo)PlanerHooks.beforeGo(v);render();$("#main").scrollTop=0;if(API.platform==="web")window.scrollTo(0,0)}}
+function go(v){if(VIEWS.some(x=>x[0]===v)){if(v!==ui.view)ui.txEdit=null;ui.view=v;if(window.PlanerHooks&&PlanerHooks.beforeGo)PlanerHooks.beforeGo(v);render();$("#main").scrollTop=0;if(API.platform==="web")window.scrollTo(0,0)}}
 
 /* ---------- отмена ---------- */
 let undoState=null,toastT=null;
@@ -323,7 +323,7 @@ function vNotes(){const items=S.notes.items||[];
   <div class="notes-wrap"><div class="note-list">${list.length?list.map(n=>`<div class="note-card ${sel&&sel.id===n.id?"on":""}" data-act="noteSel" data-id="${n.id}"><div class="panel-h"><b class="t">${esc(noteTitle(n))}</b><button class="icon" data-act="del" data-k="notes" data-id="${n.id}" aria-label="Удалить заметку">✕</button></div>${noteSnip(n)?`<span class="hint">${esc(noteSnip(n))}</span>`:""}<span class="meta">${linkCount(n)?`<span class="chip">${linkCount(n)} ${plural(linkCount(n),"ссылка","ссылки","ссылок")}</span>`:""}${tagChips("notes",n)}</span></div>`).join(""):`<p class="empty">${items.length?"Нет заметок с этим тегом.":"Заметок пока нет."}</p>`}</div>
   <div class="note-ed">${sel?(ui.noteEdit===sel.id?`<div class="note-bar"><span class="hint">Редактирование. Ссылки станут активными после «Готово».</span><button type="button" class="btn sm pri" data-act="noteDone">Готово</button></div><textarea id="notes" class="notes" data-id="${sel.id}" placeholder="Первая строка станет названием заметки. Сохраняется автоматически." aria-label="Текст заметки" spellcheck="true">${esc(sel.text)}</textarea>`:`<div class="note-bar"><span class="hint">Ссылки открываются в браузере. Нажмите на текст, чтобы изменить.</span><button type="button" class="btn sm" data-act="noteEdit" data-id="${sel.id}">Изменить</button></div><div class="note-view" data-act="noteEdit" data-id="${sel.id}" tabindex="0" role="button" aria-label="Текст заметки, нажмите чтобы изменить">${sel.text?linkify(sel.text):'<span class="hint">Пустая заметка. Нажмите, чтобы писать.</span>'}</div>`):'<p class="empty">Нажмите «Новая заметка», чтобы начать.</p>'}</div></div>`}
 
-const M=window.PlanerMoney({S,ui,esc,money,pad,D,TODAY,MONTHS,ymd,exTag,plural,save,render:(...a)=>render(...a),toast,snapshotFor,uid,tagChips,tagBar,byTag,parseTags,tagInput,TOUCH,RENAME_HINT});
+const M=window.PlanerMoney({S,ui,esc,money,pad,D,TODAY,MONTHS,ymd,exTag,plural,save,render:(...a)=>render(...a),toast,snapshotFor,uid,tagChips,tagBar,byTag,parseTags,tagInput,TOUCH,RENAME_HINT,nice});
 /* ---------- действия ---------- */
 function find(k,id){return S[k].find(x=>x.id===id)}
 document.addEventListener("click",e=>{
@@ -506,6 +506,7 @@ function histStep(from,to,word){const e=from.pop();if(!e){toast(word==="Отме
 const histUndo=()=>histStep(HIST.undo,HIST.redo,"Отменено");
 const histRedo=()=>histStep(HIST.redo,HIST.undo,"Повторено");
 const isTextField=t=>t&&(t.tagName==="TEXTAREA"||t.isContentEditable||(t.tagName==="INPUT"&&/^(text|search|number|email|password|tel|url)$/.test(t.type)));
+document.addEventListener("keydown",e=>{if(e.key==="Escape"&&ui.txEdit&&e.target.closest&&e.target.closest('form[data-form="editTx"]')){e.preventDefault();const b=document.querySelector('[data-act="editTxCancel"]');if(b)b.click()}});
 document.addEventListener("keydown",e=>{if(!(e.metaKey||e.ctrlKey)||e.altKey||e.code!=="KeyZ")return;if(isTextField(e.target))return;e.preventDefault();e.shiftKey?histRedo():histUndo()});
 /* в программе для Mac ⌘Z приходит из меню «Правка» */
 function menuUndo(redo){const t=document.activeElement;if(isTextField(t)){document.execCommand(redo?"redo":"undo");return}redo?histRedo():histUndo()}

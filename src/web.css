@@ -71,7 +71,7 @@ body{background:var(--bg)}
   table.ops thead{display:none}
   table.ops tr{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto auto;grid-template-areas:"cat cat cat sum del" "date type pay pay pay" "note note note note note" "tags tags tags tags tags";gap:4px 8px;align-items:center;padding:11px 0;border-bottom:1px dashed var(--line)}
   table.ops td{display:block;padding:0;border:0;min-width:0;background:none!important}
-  table.ops .c-cat{grid-area:cat;font-weight:600;overflow-wrap:anywhere} table.ops .c-sum{grid-area:sum;white-space:nowrap;font-weight:600} table.ops .c-del{grid-area:del}
+  table.ops .c-cat{grid-area:cat;font-weight:600;overflow-wrap:anywhere} table.ops .c-sum{grid-area:sum;white-space:nowrap;font-weight:600} table.ops .c-del{grid-area:del;display:flex;gap:2px} table.ops .icon.ed{opacity:.7}
   table.ops .c-date{grid-area:date;color:var(--muted);font-size:12px} table.ops .c-type{grid-area:type} table.ops .c-pay{grid-area:pay;font-size:12px}
   table.ops .c-note{grid-area:note;overflow-wrap:anywhere} table.ops .c-note:empty{display:none} table.ops .c-tags{grid-area:tags}
 }
